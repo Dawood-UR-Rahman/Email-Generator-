@@ -1,0 +1,373 @@
+⭐ AI PROMPT — Build Complete Temporary Email System with Custom Domain Support, Admin Panel & Modern UI
+
+You are a Senior Full-Stack Engineer + Senior UI/UX Designer.
+Build a complete TempMail-like platform, with the same clean UI as the reference image, including:
+
+✔ Public users
+
+✔ Logged-in users
+
+✔ Custom domain support
+
+✔ Auto-sync
+
+✔ Modern animations
+
+✔ IMAP + SMTP systems
+
+✔ Admin panel
+
+✔ User panel
+
+✔ MongoDB database
+
+✔ Login + Auth system
+
+✔ Fully mobile responsive
+
+✔ Clean and modern minimalist UI like the reference design
+
+🌟 1️⃣ GENERAL SYSTEM GOALS
+
+Build a full system where:
+
+✔ Public Users (Not Logged In)
+
+Can generate temporary email from system default domains
+Example:
+
+dawood.com  
+zin.com  
+to.com
+
+
+Auto-sync inbox every 8 seconds
+
+Show progress bar animation at top during syncing
+
+Can copy email
+
+Can delete the generated email
+
+Everything should look like the reference UI (sections, cards, layout).
+
+✔ Logged-in Users
+
+When user logs in:
+
+System checks if user added any custom domain
+
+If YES, then on homepage:
+✔ Show a button: “Use My Custom Domain”
+✔ Email generator dropdown must include their custom domains
+
+If NO, show system default domains only
+
+User Dashboard must include:
+
+Add Custom Domain form
+
+DNS instructions page
+
+Domain verification status
+
+Generate multiple email inboxes
+
+Delete temporary emails
+
+Auto-sync animation
+
+Real-time inbox
+
+Notifications section
+
+✔ Email Behavior
+
+When user generates an email → store in:
+
+LocalStorage
+
+MongoDB
+
+Refresh homepage automatically after 2 seconds
+
+Sync automatically every 8 seconds
+
+If new email arrives → show animation or alert
+
+Clicking email opens full message
+
+User can delete their generated inbox
+
+🌟 2️⃣ ADMIN PANEL FEATURES
+
+Create a full admin panel (modern UI):
+
+✔ Settings
+
+Add + Save IMAP Configuration
+
+Add + Save SMTP Configuration
+
+Test IMAP + SMTP buttons
+
+Add/remove system default domains
+
+✔ Users
+
+List all users
+
+Approve user custom domains
+
+Send notification message to a single user or all users
+
+View logs
+
+Disable/enable user
+
+✔ Domains
+
+Approve/reject custom domains
+
+View DNS verification status
+
+✔ Emails
+
+Monitor system email logs
+
+View errors
+
+Force IMAP resync
+
+🌟 3️⃣ USER PANEL FEATURES
+✔ Authentication System
+
+Register
+
+Login
+
+Email verification (send via SMTP)
+
+Forgot password (email link)
+
+✔ Dashboard
+
+Add Custom Domain
+
+(“How to connect your domain” instructions page)
+
+Domain status
+
+Email generator (system + user domains)
+
+Inbox
+
+Notifications
+
+Delete inbox
+
+Profile settings
+
+🌟 4️⃣ TEMPORARY EMAIL FUNCTIONALITY
+✔ Email Generation Logic
+
+Frontend function must:
+
+generateRandomEmail()
+saveToLocalStorage()
+syncInbox()
+renderMessageList()
+renderSingleMessage()
+copyEmail()
+deleteCurrentInbox()
+
+
+Backend must:
+
+/api/mailbox/create
+
+/api/messages?email=...
+
+/api/mailbox/delete
+
+/api/domain/add
+
+/api/domain/status
+
+✔ Email Expiry
+
+Lifetime: 5 days
+
+Cron job auto-delete expired inboxes
+
+Cron job auto-delete expired messages
+
+🌟 5️⃣ IMAP + SMTP SYSTEM
+
+Backend must connect using environment variables:
+
+IMAP_HOST=
+IMAP_USER=
+IMAP_PASS=
+IMAP_PORT=993
+
+SMTP_HOST=
+SMTP_USER=
+SMTP_PASS=
+SMTP_PORT=
+
+IMAP Tasks:
+
+Fetch unread messages
+
+Parse with mailparser
+
+Match “To” header with generated temporary email
+
+Return only relevant messages
+
+SMTP Tasks:
+
+Send welcome email
+
+Send password reset email
+
+Send admin notifications
+
+🌟 6️⃣ DATABASE STRUCTURE (MongoDB)
+
+Collections:
+
+users
+domains
+mailboxes
+messages
+imap_settings
+smtp_settings
+notifications
+logs
+sessions
+
+🌟 7️⃣ FRONTEND UI REQUIREMENTS (IMPORTANT)
+
+👉 Build UI exactly similar to the reference screenshot:
+
+Big clean header
+
+Email generator box with:
+
+Email field
+
+Copy button
+
+Refresh button
+
+Delete button
+
+Change button
+
+QR code button
+
+Stats section (“Emails created”, “Messages received”)
+
+Inbox table (Sender, Subject, Time)
+
+FAQ accordion section
+
+Features cards section
+
+Blog posts grid section
+
+Footer section
+
+Additional Requirements:
+
+When syncing → show a top animation bar
+
+When inbox is empty → show big empty state icon
+
+Buttons with hover effects
+
+Smooth transitions
+
+Fully responsive for mobile
+
+🌟 8️⃣ FRONTEND TECHNOLOGIES
+
+Use:
+
+HTML5
+
+Modern CSS (or Tailwind optional)
+
+Vanilla JS
+
+Clean animations
+
+🌟 9️⃣ BACKEND ARCHITECTURE
+
+Required folder structure:
+
+/backend
+  /models
+  /controllers
+  /routes
+  /services
+  /middleware
+  /utils
+  /config
+  server.js
+  cron.js
+  package.json
+  .env.example
+
+
+Services:
+
+imapService.js
+
+smtpService.js
+
+emailParser.js
+
+domainVerifier.js
+
+authService.js
+
+notificationService.js
+
+🌟 🔟 DELIVERABLES
+Backend files
+Frontend files
+Admin dashboard pages
+User dashboard pages
+Full documentation:
+
+Installation
+
+MongoDB setup
+
+IMAP setup
+
+SMTP setup
+
+Domain DNS setup
+
+How to run locally
+
+How to deploy
+
+✔ FINAL
+
+This complete prompt includes:
+
+✓ TempMail-style UI
+✓ Dynamic domain behavior (public vs logged-in users)
+✓ Custom domains
+✓ Auto-sync + animation
+✓ Admin Panel
+✓ User Panel
+✓ Full email engine (IMAP+SMTP)
+✓ Auth system
+✓ MongoDB
+✓ Complete code structure
