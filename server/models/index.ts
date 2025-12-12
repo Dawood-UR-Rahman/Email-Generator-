@@ -1,0 +1,93 @@
+import mongoose from "mongoose";
+
+const UserSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  role: { type: String, enum: ["user", "admin"], default: "user" },
+  isVerified: { type: Boolean, default: false },
+  verificationToken: String,
+  resetToken: String,
+  resetTokenExpiry: Date,
+}, { timestamps: true });
+
+const DomainSchema = new mongoose.Schema({
+  name: { type: String, required: true, unique: true },
+  type: { type: String, enum: ["system", "custom"], default: "custom" },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  isVerified: { type: Boolean, default: false },
+  verificationTxt: String,
+  dnsStatus: { type: String, enum: ["pending", "verified", "failed"], default: "pending" },
+  isActive: { type: Boolean, default: true },
+}, { timestamps: true });
+
+const MailboxSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  domain: { type: String, required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  isPublic: { type: Boolean, default: true },
+  expiresAt: { type: Date, required: true },
+}, { timestamps: true });
+
+const MessageSchema = new mongoose.Schema({
+  mailboxId: { type: mongoose.Schema.Types.ObjectId, ref: "Mailbox", required: true },
+  mailboxEmail: { type: String, required: true },
+  from: { type: String, required: true },
+  fromName: String,
+  to: { type: String, required: true },
+  subject: { type: String, required: true },
+  textBody: String,
+  htmlBody: String,
+  attachments: [{
+    filename: String,
+    contentType: String,
+    size: Number,
+    content: String,
+  }],
+  isRead: { type: Boolean, default: false },
+  receivedAt: { type: Date, default: Date.now },
+}, { timestamps: true });
+
+const ImapSettingsSchema = new mongoose.Schema({
+  host: { type: String, required: true },
+  port: { type: Number, required: true },
+  user: { type: String, required: true },
+  password: { type: String, required: true },
+  tls: { type: Boolean, default: true },
+  isActive: { type: Boolean, default: true },
+  lastSync: Date,
+}, { timestamps: true });
+
+const SmtpSettingsSchema = new mongoose.Schema({
+  host: { type: String, required: true },
+  port: { type: Number, required: true },
+  user: { type: String, required: true },
+  password: { type: String, required: true },
+  secure: { type: Boolean, default: true },
+  isActive: { type: Boolean, default: true },
+}, { timestamps: true });
+
+const NotificationSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  title: { type: String, required: true },
+  message: { type: String, required: true },
+  type: { type: String, enum: ["info", "warning", "success", "error"], default: "info" },
+  isRead: { type: Boolean, default: false },
+  isGlobal: { type: Boolean, default: false },
+}, { timestamps: true });
+
+const LogSchema = new mongoose.Schema({
+  action: { type: String, required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  details: String,
+  level: { type: String, enum: ["info", "warning", "error"], default: "info" },
+}, { timestamps: true });
+
+export const User = mongoose.model("User", UserSchema);
+export const Domain = mongoose.model("Domain", DomainSchema);
+export const Mailbox = mongoose.model("Mailbox", MailboxSchema);
+export const Message = mongoose.model("Message", MessageSchema);
+export const ImapSettings = mongoose.model("ImapSettings", ImapSettingsSchema);
+export const SmtpSettings = mongoose.model("SmtpSettings", SmtpSettingsSchema);
+export const Notification = mongoose.model("Notification", NotificationSchema);
+export const Log = mongoose.model("Log", LogSchema);
