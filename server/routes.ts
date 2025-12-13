@@ -14,15 +14,18 @@ const DEFAULT_DOMAINS = ["tempmail.io", "quickmail.dev", "disposable.cc"];
 
 async function seedDefaultDomains(): Promise<void> {
   for (const domainName of DEFAULT_DOMAINS) {
-    const exists = await Domain.findOne({ name: domainName });
-    if (!exists) {
-      await Domain.create({
-        name: domainName,
-        type: "system",
-        isVerified: true,
-        isActive: true,
-      });
-    }
+    await Domain.findOneAndUpdate(
+      { name: domainName },
+      { 
+        $setOnInsert: {
+          name: domainName,
+          type: "system",
+          isVerified: true,
+          isActive: true,
+        }
+      },
+      { upsert: true }
+    );
   }
 }
 
