@@ -48,6 +48,8 @@ export interface Domain {
   verificationTxt?: string;
   dnsStatus?: "pending" | "verified" | "failed";
   isActive: boolean;
+  isDefault: boolean;
+  retentionDays: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -184,6 +186,83 @@ export interface Stats {
   activeUsers: number;
   activeDomains: number;
 }
+
+// Blog Post Schema
+export interface BlogPost {
+  _id: string;
+  title: string;
+  slug: string;
+  content: string;
+  excerpt: string;
+  author: string;
+  isPublished: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const insertBlogPostSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  slug: z.string().min(1, "Slug is required"),
+  content: z.string().min(1, "Content is required"),
+  excerpt: z.string().optional().default(""),
+  isPublished: z.boolean().default(false),
+});
+
+export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
+
+// Page Content Schema (for Privacy, Terms, Contact, Homepage)
+export interface PageContent {
+  _id: string;
+  slug: string;
+  title: string;
+  content: string;
+  updatedAt: Date;
+}
+
+export const insertPageContentSchema = z.object({
+  slug: z.string().min(1, "Slug is required"),
+  title: z.string().min(1, "Title is required"),
+  content: z.string().min(1, "Content is required"),
+});
+
+export type InsertPageContent = z.infer<typeof insertPageContentSchema>;
+
+// Ad Snippet Schema
+export interface AdSnippet {
+  _id: string;
+  name: string;
+  position: "header" | "sidebar" | "content" | "footer";
+  code: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const insertAdSnippetSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  position: z.enum(["header", "sidebar", "content", "footer"]),
+  code: z.string().min(1, "Ad code is required"),
+  isActive: z.boolean().default(true),
+});
+
+export type InsertAdSnippet = z.infer<typeof insertAdSnippetSchema>;
+
+// App Settings Schema
+export interface AppSettings {
+  _id: string;
+  defaultRetentionDays: number;
+  emailSyncIntervalSeconds: number;
+  soundNotificationsEnabled: boolean;
+  updatedAt: Date;
+}
+
+export const appSettingsSchema = z.object({
+  defaultRetentionDays: z.number().min(1).max(30).default(5),
+  emailSyncIntervalSeconds: z.number().min(5).max(60).default(10),
+  soundNotificationsEnabled: z.boolean().default(true),
+});
+
+export type InsertAppSettings = z.infer<typeof appSettingsSchema>;
 
 // API Response types
 export interface AuthResponse {

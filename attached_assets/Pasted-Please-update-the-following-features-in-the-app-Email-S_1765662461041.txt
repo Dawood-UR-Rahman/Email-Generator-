@@ -1,0 +1,65 @@
+Please update the following features in the app:
+
+Email Sync & Notifications
+
+Improve the email sync and receive speed so new emails appear instantly.
+
+Add a browser sound notification when a new email is received.
+
+Ensure the system continuously checks all incoming emails and displays any new messages related to the temporary email address without delay.
+
+SMTP Issue (Admin Panel)
+
+Fix the SMTP connection error in the admin panel so it connects properly without errors.
+
+Blog & Content Management (Admin Panel)
+
+Add an option in the admin panel for the admin to create, edit, and manage blog posts using a professional content editor.
+
+Allow the admin to update homepage content from the admin panel.
+
+Provide an option for the admin to insert manual advertisement code.
+
+If ads are enabled, the ad elements should appear on all frontend pages.
+
+Allow the admin to update the Contact page content.
+
+Additional Pages
+
+Add Privacy Policy and Terms & Conditions pages.
+
+The admin should be able to manage and update the content of both pages from the admin panel.
+
+Frontend Improvements
+
+Set the website theme to default dark mode.
+
+When a user visits the website for the first time, automatically generate a temporary email using the default domain instead of showing the “Generate Email” button.
+
+When the user refreshes the page, the existing email should remain the same and should not be removed or regenerated.
+
+A new email should only be generated, or an existing email deleted, when the user clicks the Delete button or when the email lifetime expires.
+
+Domain Management (Admin Panel)
+
+Allow the admin to add new domains.
+
+Allow the admin to remove existing domains.
+
+Enable setting a default domain.
+
+Temporary Email Lifecycle
+
+Add an option for the admin to define the lifetime of temporary emails (in days).
+
+Temporary emails should be automatically removed from the system once the defined lifetime is completed.
+
+QR Code Generation
+
+Ensure the QR code is generated correctly and accurately reflects the assigned email address.
+
+Custom Email Name (User Option)
+
+Allow users to enter a custom temporary email name.
+
+Generate the temporary email based on the user-selected domain.

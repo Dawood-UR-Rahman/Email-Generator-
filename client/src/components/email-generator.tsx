@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { Copy, RefreshCw, Trash2, ChevronDown, QrCode, Check } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Copy, RefreshCw, Trash2, ChevronDown, QrCode, Check, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useEmail } from "@/lib/email-context";
 import { useAuth } from "@/lib/auth-context";
@@ -17,7 +18,80 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
+
+function generateQRCodeDataURL(text: string, size: number = 200): string {
+  const qrModules = generateQRMatrix(text);
+  const moduleCount = qrModules.length;
+  const cellSize = Math.floor(size / moduleCount);
+  const actualSize = cellSize * moduleCount;
+  
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${actualSize}" height="${actualSize}" viewBox="0 0 ${moduleCount} ${moduleCount}">`;
+  svg += `<rect width="${moduleCount}" height="${moduleCount}" fill="white"/>`;
+  
+  for (let row = 0; row < moduleCount; row++) {
+    for (let col = 0; col < moduleCount; col++) {
+      if (qrModules[row][col]) {
+        svg += `<rect x="${col}" y="${row}" width="1" height="1" fill="black"/>`;
+      }
+    }
+  }
+  svg += `</svg>`;
+  
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+}
+
+function generateQRMatrix(text: string): boolean[][] {
+  const size = 21;
+  const matrix: boolean[][] = Array(size).fill(null).map(() => Array(size).fill(false));
+  
+  addFinderPattern(matrix, 0, 0);
+  addFinderPattern(matrix, size - 7, 0);
+  addFinderPattern(matrix, 0, size - 7);
+  
+  for (let i = 8; i < size - 8; i++) {
+    matrix[6][i] = i % 2 === 0;
+    matrix[i][6] = i % 2 === 0;
+  }
+  
+  const bytes = new TextEncoder().encode(text);
+  let bitIndex = 0;
+  for (let col = size - 1; col > 0; col -= 2) {
+    if (col === 6) col--;
+    for (let row = 0; row < size; row++) {
+      for (let c = 0; c < 2; c++) {
+        const x = col - c;
+        if (!isReserved(x, row, size)) {
+          const byteIndex = Math.floor(bitIndex / 8);
+          const bitOffset = 7 - (bitIndex % 8);
+          if (byteIndex < bytes.length) {
+            matrix[row][x] = ((bytes[byteIndex] >> bitOffset) & 1) === 1;
+          }
+          bitIndex++;
+        }
+      }
+    }
+  }
+  
+  return matrix;
+}
+
+function addFinderPattern(matrix: boolean[][], startRow: number, startCol: number) {
+  for (let r = 0; r < 7; r++) {
+    for (let c = 0; c < 7; c++) {
+      const isEdge = r === 0 || r === 6 || c === 0 || c === 6;
+      const isInner = r >= 2 && r <= 4 && c >= 2 && c <= 4;
+      matrix[startRow + r][startCol + c] = isEdge || isInner;
+    }
+  }
+}
+
+function isReserved(x: number, y: number, size: number): boolean {
+  if ((x < 8 && y < 8) || (x < 8 && y >= size - 8) || (x >= size - 8 && y < 8)) return true;
+  if (x === 6 || y === 6) return true;
+  return false;
+}
 
 export function EmailGenerator() {
   const {
@@ -35,12 +109,25 @@ export function EmailGenerator() {
   const { isAuthenticated } = useAuth();
   const [copied, setCopied] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const [showCustomEmail, setShowCustomEmail] = useState(false);
+  const [customName, setCustomName] = useState("");
 
   const handleCopy = async () => {
     const success = await copyEmail();
     if (success) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleGenerateCustomEmail = () => {
+    if (customName.trim()) {
+      const sanitized = customName.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "");
+      if (sanitized.length >= 3) {
+        generateEmail(currentDomain, sanitized);
+        setShowCustomEmail(false);
+        setCustomName("");
+      }
     }
   };
 
@@ -54,6 +141,13 @@ export function EmailGenerator() {
   const defaultDomains = availableDomains.length > 0 
     ? availableDomains 
     : [{ _id: "1", name: "tempmail.io", type: "system" as const, isVerified: true, isActive: true, createdAt: new Date(), updatedAt: new Date() }];
+
+  const qrCodeDataUrl = useMemo(() => {
+    if (currentEmail) {
+      return generateQRCodeDataURL(`mailto:${currentEmail}`, 200);
+    }
+    return "";
+  }, [currentEmail]);
 
   return (
     <div className="relative -mt-16 z-10">
@@ -78,7 +172,7 @@ export function EmailGenerator() {
                   {currentEmail}
                 </div>
               ) : (
-                <div className="bg-muted/50 rounded-lg p-4">
+                <div className="bg-muted/50 rounded-lg p-4 space-y-3">
                   <Button 
                     size="lg" 
                     onClick={() => generateEmail()}
@@ -86,6 +180,17 @@ export function EmailGenerator() {
                   >
                     Generate Email Address
                   </Button>
+                  <div className="text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowCustomEmail(true)}
+                      data-testid="button-custom-email"
+                    >
+                      <Edit3 className="h-4 w-4 mr-2" />
+                      Choose custom name
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -189,13 +294,57 @@ export function EmailGenerator() {
             <DialogTitle>QR Code</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col items-center justify-center p-6">
-            <div className="w-48 h-48 bg-muted rounded-lg flex items-center justify-center mb-4">
-              <QrCode className="h-32 w-32 text-muted-foreground" />
-            </div>
+            {qrCodeDataUrl ? (
+              <img 
+                src={qrCodeDataUrl} 
+                alt="QR Code for email address" 
+                className="w-48 h-48 mb-4"
+                data-testid="img-qr-code"
+              />
+            ) : (
+              <div className="w-48 h-48 bg-muted rounded-lg flex items-center justify-center mb-4">
+                <QrCode className="h-32 w-32 text-muted-foreground" />
+              </div>
+            )}
             <p className="text-sm text-muted-foreground text-center font-mono">
               {currentEmail}
             </p>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCustomEmail} onOpenChange={setShowCustomEmail}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Choose Custom Email Name</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-2">
+              <Input
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder="yourname"
+                className="flex-1"
+                data-testid="input-custom-email-name"
+              />
+              <span className="text-muted-foreground">@{currentDomain || "tempmail.io"}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Use only letters, numbers, dots, hyphens, and underscores. Minimum 3 characters.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCustomEmail(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleGenerateCustomEmail}
+              disabled={customName.trim().length < 3}
+              data-testid="button-confirm-custom-email"
+            >
+              Create Email
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

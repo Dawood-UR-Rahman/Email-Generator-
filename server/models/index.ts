@@ -19,6 +19,8 @@ const DomainSchema = new mongoose.Schema({
   verificationTxt: String,
   dnsStatus: { type: String, enum: ["pending", "verified", "failed"], default: "pending" },
   isActive: { type: Boolean, default: true },
+  isDefault: { type: Boolean, default: false },
+  retentionDays: { type: Number, default: 5 },
 }, { timestamps: true });
 
 const MailboxSchema = new mongoose.Schema({
@@ -83,6 +85,34 @@ const LogSchema = new mongoose.Schema({
   level: { type: String, enum: ["info", "warning", "error"], default: "info" },
 }, { timestamps: true });
 
+const BlogPostSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  slug: { type: String, required: true, unique: true },
+  content: { type: String, required: true },
+  excerpt: { type: String, default: "" },
+  author: { type: String, default: "Admin" },
+  isPublished: { type: Boolean, default: false },
+}, { timestamps: true });
+
+const PageContentSchema = new mongoose.Schema({
+  slug: { type: String, required: true, unique: true },
+  title: { type: String, required: true },
+  content: { type: String, required: true },
+}, { timestamps: true });
+
+const AdSnippetSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  position: { type: String, enum: ["header", "sidebar", "content", "footer"], required: true },
+  code: { type: String, required: true },
+  isActive: { type: Boolean, default: true },
+}, { timestamps: true });
+
+const AppSettingsSchema = new mongoose.Schema({
+  defaultRetentionDays: { type: Number, default: 5 },
+  emailSyncIntervalSeconds: { type: Number, default: 10 },
+  soundNotificationsEnabled: { type: Boolean, default: true },
+}, { timestamps: true });
+
 export const User = mongoose.model("User", UserSchema);
 export const Domain = mongoose.model("Domain", DomainSchema);
 export const Mailbox = mongoose.model("Mailbox", MailboxSchema);
@@ -91,3 +121,7 @@ export const ImapSettings = mongoose.model("ImapSettings", ImapSettingsSchema);
 export const SmtpSettings = mongoose.model("SmtpSettings", SmtpSettingsSchema);
 export const Notification = mongoose.model("Notification", NotificationSchema);
 export const Log = mongoose.model("Log", LogSchema);
+export const BlogPost = mongoose.model("BlogPost", BlogPostSchema);
+export const PageContent = mongoose.model("PageContent", PageContentSchema);
+export const AdSnippet = mongoose.model("AdSnippet", AdSnippetSchema);
+export const AppSettings = mongoose.model("AppSettings", AppSettingsSchema);

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import type { Message, Domain } from "@shared/schema";
 
 interface EmailContextType {
@@ -9,7 +9,7 @@ interface EmailContextType {
   isLoading: boolean;
   isSyncing: boolean;
   syncProgress: number;
-  generateEmail: (domain?: string) => void;
+  generateEmail: (domain?: string, customName?: string) => void;
   copyEmail: () => Promise<boolean>;
   deleteInbox: () => void;
   changeDomain: (domain: string) => void;
@@ -18,6 +18,8 @@ interface EmailContextType {
   selectedMessage: Message | null;
   deleteMessage: (messageId: string) => Promise<void>;
   stats: { emailsCreated: number; messagesReceived: number };
+  soundEnabled: boolean;
+  setSoundEnabled: (enabled: boolean) => void;
 }
 
 const EmailContext = createContext<EmailContextType | undefined>(undefined);
@@ -33,6 +35,24 @@ function generateRandomString(length: number = 10): string {
   return result;
 }
 
+function playNotificationSound() {
+  try {
+    const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.frequency.value = 800;
+    oscillator.type = "sine";
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+  } catch {
+    console.log("Could not play notification sound");
+  }
+}
+
 export function EmailProvider({ children }: { children: ReactNode }) {
   const [currentEmail, setCurrentEmail] = useState<string | null>(null);
   const [currentDomain, setCurrentDomain] = useState<string>(DEFAULT_DOMAINS[0]);
@@ -43,6 +63,12 @@ export function EmailProvider({ children }: { children: ReactNode }) {
   const [syncProgress, setSyncProgress] = useState(0);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [stats, setStats] = useState({ emailsCreated: 0, messagesReceived: 0 });
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    const stored = localStorage.getItem("soundEnabled");
+    return stored !== "false";
+  });
+  const previousMessageCount = useRef(0);
+  const hasInitialized = useRef(false);
 
   const loadFromStorage = useCallback(() => {
     const storedEmail = localStorage.getItem("tempEmail");
@@ -57,7 +83,9 @@ export function EmailProvider({ children }: { children: ReactNode }) {
     }
     if (storedMessages) {
       try {
-        setMessages(JSON.parse(storedMessages));
+        const parsed = JSON.parse(storedMessages);
+        setMessages(parsed);
+        previousMessageCount.current = parsed.length;
       } catch {
         setMessages([]);
       }
@@ -71,18 +99,28 @@ export function EmailProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const data = await response.json();
         setDomains(data);
+        const defaultDomain = data.find((d: Domain) => d.isDefault);
+        if (defaultDomain && !localStorage.getItem("tempDomain")) {
+          setCurrentDomain(defaultDomain.name);
+        }
+        return data;
       }
     } catch {
-      setDomains(DEFAULT_DOMAINS.map((name, i) => ({
+      const fallbackDomains = DEFAULT_DOMAINS.map((name, i) => ({
         _id: String(i),
         name,
         type: "system" as const,
         isVerified: true,
         isActive: true,
+        isDefault: i === 0,
+        retentionDays: 5,
         createdAt: new Date(),
         updatedAt: new Date(),
-      })));
+      }));
+      setDomains(fallbackDomains);
+      return fallbackDomains;
     }
+    return [];
   }, []);
 
   const fetchStats = useCallback(async () => {
@@ -117,6 +155,10 @@ export function EmailProvider({ children }: { children: ReactNode }) {
       const response = await fetch(`/api/messages?email=${encodeURIComponent(currentEmail)}`);
       if (response.ok) {
         const data = await response.json();
+        if (data.length > previousMessageCount.current && soundEnabled && hasInitialized.current) {
+          playNotificationSound();
+        }
+        previousMessageCount.current = data.length;
         setMessages(data);
         localStorage.setItem("tempMessages", JSON.stringify(data));
       }
@@ -130,27 +172,56 @@ export function EmailProvider({ children }: { children: ReactNode }) {
         setSyncProgress(0);
       }, 300);
     }
-  }, [currentEmail]);
+  }, [currentEmail, soundEnabled]);
 
   useEffect(() => {
     if (!currentEmail) return;
 
     const interval = setInterval(() => {
       refreshInbox();
-    }, 8000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [currentEmail, refreshInbox]);
 
-  const generateEmail = useCallback((domain?: string) => {
+  useEffect(() => {
+    if (!isLoading && !hasInitialized.current && domains.length > 0) {
+      hasInitialized.current = true;
+      const storedEmail = localStorage.getItem("tempEmail");
+      if (!storedEmail) {
+        const defaultDomain = domains.find(d => d.isDefault) || domains[0];
+        if (defaultDomain) {
+          const username = generateRandomString(10);
+          const email = `${username}@${defaultDomain.name}`;
+          setCurrentEmail(email);
+          setCurrentDomain(defaultDomain.name);
+          localStorage.setItem("tempEmail", email);
+          localStorage.setItem("tempDomain", defaultDomain.name);
+          localStorage.setItem("tempMessages", "[]");
+          fetch("/api/mailbox/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, domain: defaultDomain.name }),
+          }).catch(() => {});
+        }
+      }
+    }
+  }, [isLoading, domains]);
+
+  useEffect(() => {
+    localStorage.setItem("soundEnabled", String(soundEnabled));
+  }, [soundEnabled]);
+
+  const generateEmail = useCallback((domain?: string, customName?: string) => {
     const selectedDomain = domain || currentDomain;
-    const username = generateRandomString(10);
+    const username = customName || generateRandomString(10);
     const email = `${username}@${selectedDomain}`;
     
     setCurrentEmail(email);
     setCurrentDomain(selectedDomain);
     setMessages([]);
     setSelectedMessage(null);
+    previousMessageCount.current = 0;
     
     localStorage.setItem("tempEmail", email);
     localStorage.setItem("tempDomain", selectedDomain);
@@ -232,6 +303,8 @@ export function EmailProvider({ children }: { children: ReactNode }) {
         selectedMessage,
         deleteMessage,
         stats,
+        soundEnabled,
+        setSoundEnabled,
       }}
     >
       {children}
