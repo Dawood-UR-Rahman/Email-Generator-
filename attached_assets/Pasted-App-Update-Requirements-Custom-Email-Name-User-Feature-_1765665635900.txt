@@ -1,0 +1,83 @@
+App Update Requirements
+
+Custom Email Name (User Feature)
+
+Allow users to create a custom email name using any available domain.
+
+For example, if the admin has added 3 domains to the system, the user should be able to choose a domain and enter their own custom email name.
+
+Blog Management System (Admin Panel)
+
+Improve the blog feature so the admin can create and manage multiple blog posts.
+
+Each blog post should support:
+
+A featured image
+
+Rich content using a powerful content editor
+
+Meta title and meta description fields for SEO
+
+Ensure featured images display correctly on blog cards on the frontend.
+
+Site Settings (Admin Panel)
+
+Add a General Settings section where the admin can manage:
+
+Site name
+
+Site logo
+
+Default meta title
+
+Default meta description
+
+Pages Management
+
+Ensure Privacy Policy, Terms & Conditions, and Blog pages work properly.
+
+The admin should be able to update the content of these pages easily from the admin panel.
+
+Contact Us Form
+
+All contact form submissions should be stored in the admin panel.
+
+The admin should be able to view and manage all submissions properly.
+
+SMTP Configuration
+
+Add an option to send a test email from the SMTP settings page.
+
+This will allow the admin to verify that the SMTP configuration is working correctly.
+
+Password Recovery System
+
+Implement a proper “Forgot Password” system so users can easily reset and update their passwords.
+
+Homepage & Dynamic Content Management (Admin Panel)
+
+Allow the admin to update all homepage content, including:
+
+FAQ section
+
+Random email creation messages
+
+Received email messages
+
+Active user and uptime content
+
+All content should be editable according to the admin’s requirements.
+
+Advertisements Management
+
+In the ads section, display demo ad placeholders (e.g., 214×33 banner sizes) so the admin knows which ad sizes are supported.
+
+Allow the admin to hide demo ads.
+
+When the admin adds real ad code, display the real ad instead of the demo placeholder.
+
+Welcome Email
+
+Send a branded welcome email to users upon registration.
+
+The email should include the site logo and site name.

@@ -20,6 +20,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 function generateQRCodeDataURL(text: string, size: number = 200): string {
   const qrModules = generateQRMatrix(text);
@@ -111,6 +118,7 @@ export function EmailGenerator() {
   const [showQR, setShowQR] = useState(false);
   const [showCustomEmail, setShowCustomEmail] = useState(false);
   const [customName, setCustomName] = useState("");
+  const [selectedDomain, setSelectedDomain] = useState("");
 
   const handleCopy = async () => {
     const success = await copyEmail();
@@ -124,11 +132,18 @@ export function EmailGenerator() {
     if (customName.trim()) {
       const sanitized = customName.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "");
       if (sanitized.length >= 3) {
-        generateEmail(currentDomain, sanitized);
+        const domainToUse = selectedDomain || currentDomain || defaultDomains[0]?.name || "tempmail.io";
+        generateEmail(domainToUse, sanitized);
         setShowCustomEmail(false);
         setCustomName("");
+        setSelectedDomain("");
       }
     }
+  };
+
+  const handleOpenCustomEmailDialog = () => {
+    setSelectedDomain(currentDomain || defaultDomains[0]?.name || "tempmail.io");
+    setShowCustomEmail(true);
   };
 
   const systemDomains = domains.filter((d) => d.type === "system");
@@ -184,7 +199,7 @@ export function EmailGenerator() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setShowCustomEmail(true)}
+                      onClick={handleOpenCustomEmailDialog}
                       data-testid="button-custom-email"
                     >
                       <Edit3 className="h-4 w-4 mr-2" />
@@ -319,21 +334,47 @@ export function EmailGenerator() {
             <DialogTitle>Choose Custom Email Name</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="flex items-center gap-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Email Name</label>
               <Input
                 value={customName}
                 onChange={(e) => setCustomName(e.target.value)}
                 placeholder="yourname"
-                className="flex-1"
                 data-testid="input-custom-email-name"
               />
-              <span className="text-muted-foreground">@{currentDomain || "tempmail.io"}</span>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Domain</label>
+              <Select value={selectedDomain} onValueChange={setSelectedDomain}>
+                <SelectTrigger data-testid="select-custom-domain">
+                  <SelectValue placeholder="Select a domain" />
+                </SelectTrigger>
+                <SelectContent>
+                  {defaultDomains.filter(d => d.type === "system").map((domain) => (
+                    <SelectItem key={domain._id} value={domain.name} data-testid={`option-domain-${domain.name}`}>
+                      @{domain.name}
+                    </SelectItem>
+                  ))}
+                  {isAuthenticated && customDomains.length > 0 && (
+                    <>
+                      {customDomains.map((domain) => (
+                        <SelectItem key={domain._id} value={domain.name} data-testid={`option-custom-domain-${domain.name}`}>
+                          @{domain.name} (Custom)
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="bg-muted/50 rounded-md p-3 text-center font-mono text-sm">
+              {customName.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "") || "yourname"}@{selectedDomain || "tempmail.io"}
             </div>
             <p className="text-xs text-muted-foreground">
               Use only letters, numbers, dots, hyphens, and underscores. Minimum 3 characters.
             </p>
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowCustomEmail(false)}>
               Cancel
             </Button>

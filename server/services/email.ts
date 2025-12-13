@@ -130,3 +130,56 @@ export async function testSmtpConnection(): Promise<boolean> {
     return false;
   }
 }
+
+export async function sendTestEmail(email: string): Promise<boolean> {
+  return sendEmail({
+    to: email,
+    subject: "Test Email - TempMail SMTP Configuration",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #f97316;">SMTP Test Successful!</h1>
+        <p>This is a test email to verify your SMTP configuration is working correctly.</p>
+        <p>If you received this email, your SMTP settings are configured properly.</p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+        <p style="color: #666; font-size: 12px;">
+          Sent from TempMail Admin Panel
+        </p>
+      </div>
+    `,
+  });
+}
+
+export async function sendWelcomeEmail(email: string, username: string, siteName: string = "TempMail", siteLogo: string = ""): Promise<boolean> {
+  const logoHtml = siteLogo 
+    ? `<img src="${siteLogo}" alt="${siteName}" style="max-width: 150px; margin-bottom: 20px;">` 
+    : "";
+  
+  return sendEmail({
+    to: email,
+    subject: `Welcome to ${siteName}!`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; text-align: center;">
+        ${logoHtml}
+        <h1 style="color: #f97316;">Welcome to ${siteName}!</h1>
+        <p>Hi ${username},</p>
+        <p>Thank you for creating an account with us. You can now enjoy all the features of our temporary email service.</p>
+        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3>What you can do:</h3>
+          <ul style="text-align: left; padding-left: 20px;">
+            <li>Create disposable email addresses</li>
+            <li>Receive emails instantly</li>
+            <li>Add custom domains</li>
+            <li>Protect your privacy</li>
+          </ul>
+        </div>
+        <a href="${process.env.APP_URL || 'http://localhost:5000'}" style="display: inline-block; background: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 16px 0;">
+          Get Started
+        </a>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+        <p style="color: #666; font-size: 12px;">
+          &copy; ${new Date().getFullYear()} ${siteName}. All rights reserved.
+        </p>
+      </div>
+    `,
+  });
+}

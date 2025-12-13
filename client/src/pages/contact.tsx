@@ -45,7 +45,16 @@ export default function Contact() {
   const onSubmit = async (data: ContactForm) => {
     setIsLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to send message");
+      }
       toast({
         title: "Message sent!",
         description: "We'll get back to you as soon as possible.",

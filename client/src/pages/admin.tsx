@@ -4,7 +4,7 @@ import {
   Mail, Settings, Users, Globe, Inbox, FileText, 
   Save, TestTube, Check, X, Send, Trash2, RefreshCw,
   LogOut, AlertCircle, CheckCircle, Eye, EyeOff,
-  Plus, Star, Edit, BookOpen, Layout, Megaphone
+  Plus, Star, Edit, BookOpen, Layout, Megaphone, MessageSquare, Home
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -60,9 +60,12 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { 
   imapSettingsSchema, smtpSettingsSchema, insertDomainSchema, 
   insertBlogPostSchema, insertPageContentSchema, insertAdSnippetSchema, appSettingsSchema,
+  siteSettingsSchema, homepageContentSchema,
   type InsertImapSettings, type InsertSmtpSettings, type InsertDomain,
   type InsertBlogPost, type InsertPageContent, type InsertAdSnippet, type InsertAppSettings,
-  type User, type Domain, type Log, type BlogPost, type PageContent, type AdSnippet, type AppSettings
+  type InsertSiteSettings, type InsertHomepageContent,
+  type User, type Domain, type Log, type BlogPost, type PageContent, type AdSnippet, type AppSettings,
+  type SiteSettings, type ContactSubmission, type HomepageContent, type FAQItem
 } from "@shared/schema";
 
 export default function Admin() {
@@ -77,11 +80,17 @@ export default function Admin() {
   const [pages, setPages] = useState<PageContent[]>([]);
   const [ads, setAds] = useState<AdSnippet[]>([]);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
+  const [contacts, setContacts] = useState<ContactSubmission[]>([]);
+  const [homepageContent, setHomepageContent] = useState<HomepageContent | null>(null);
+  const [faqItems, setFaqItems] = useState<FAQItem[]>([]);
   
   const [showImapPassword, setShowImapPassword] = useState(false);
   const [showSmtpPassword, setShowSmtpPassword] = useState(false);
   const [testingImap, setTestingImap] = useState(false);
   const [testingSmtp, setTestingSmtp] = useState(false);
+  const [testEmailRecipient, setTestEmailRecipient] = useState("");
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
   const [showAddDomainDialog, setShowAddDomainDialog] = useState(false);
   const [showBlogDialog, setShowBlogDialog] = useState(false);
   const [showPageDialog, setShowPageDialog] = useState(false);
@@ -126,6 +135,9 @@ export default function Admin() {
       slug: "",
       content: "",
       excerpt: "",
+      featuredImage: "",
+      metaTitle: "",
+      metaDescription: "",
       isPublished: false,
     },
   });
@@ -158,6 +170,34 @@ export default function Admin() {
     },
   });
 
+  const siteSettingsForm = useForm<InsertSiteSettings>({
+    resolver: zodResolver(siteSettingsSchema),
+    defaultValues: {
+      siteName: "TempMail",
+      siteLogo: "",
+      defaultMetaTitle: "TempMail - Free Temporary Email Service",
+      defaultMetaDescription: "Create disposable email addresses instantly. Protect your privacy with our free temporary email service.",
+    },
+  });
+
+  const homepageForm = useForm<InsertHomepageContent>({
+    resolver: zodResolver(homepageContentSchema),
+    defaultValues: {
+      heroContent: {
+        title: "Instant Disposable Email",
+        subtitle: "Protect your privacy with temporary email addresses",
+        generateButtonText: "Generate Email",
+      },
+      statsContent: {
+        emailsCreatedLabel: "Emails Created",
+        messagesReceivedLabel: "Messages Received",
+        activeUsersLabel: "Active Users",
+        uptimeLabel: "Uptime",
+      },
+      faqItems: [],
+    },
+  });
+
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) {
       setLocation("/login");
@@ -171,12 +211,15 @@ export default function Admin() {
     const headers = { "Authorization": `Bearer ${token}` };
     
     try {
-      const [domainsRes, blogRes, pagesRes, adsRes, settingsRes] = await Promise.all([
+      const [domainsRes, blogRes, pagesRes, adsRes, settingsRes, siteSettingsRes, contactsRes, homepageRes] = await Promise.all([
         fetch("/api/admin/domains", { headers }),
         fetch("/api/admin/blog", { headers }),
         fetch("/api/admin/pages", { headers }),
         fetch("/api/admin/ads", { headers }),
         fetch("/api/admin/settings", { headers }),
+        fetch("/api/admin/site-settings", { headers }),
+        fetch("/api/admin/contacts", { headers }),
+        fetch("/api/admin/homepage-content", { headers }),
       ]);
       
       if (domainsRes.ok) {
@@ -204,9 +247,92 @@ export default function Admin() {
           soundNotificationsEnabled: data.soundNotificationsEnabled ?? true,
         });
       }
+      if (siteSettingsRes.ok) {
+        const data = await siteSettingsRes.json();
+        setSiteSettings(data);
+        siteSettingsForm.reset({
+          siteName: data.siteName || "TempMail",
+          siteLogo: data.siteLogo || "",
+          defaultMetaTitle: data.defaultMetaTitle || "TempMail - Free Temporary Email Service",
+          defaultMetaDescription: data.defaultMetaDescription || "Create disposable email addresses instantly. Protect your privacy with our free temporary email service.",
+        });
+      }
+      if (contactsRes.ok) {
+        const data = await contactsRes.json();
+        setContacts(data);
+      }
+      if (homepageRes.ok) {
+        const data = await homepageRes.json();
+        setHomepageContent(data);
+        setFaqItems(data.faqItems || []);
+        homepageForm.reset({
+          heroContent: data.heroContent || {
+            title: "Instant Disposable Email",
+            subtitle: "Protect your privacy with temporary email addresses",
+            generateButtonText: "Generate Email",
+          },
+          statsContent: data.statsContent || {
+            emailsCreatedLabel: "Emails Created",
+            messagesReceivedLabel: "Messages Received",
+            activeUsersLabel: "Active Users",
+            uptimeLabel: "Uptime",
+          },
+          faqItems: data.faqItems || [],
+        });
+      }
     } catch (error) {
       console.error("Failed to fetch data:", error);
     }
+  };
+
+  const handleDeleteContact = async (contactId: string) => {
+    try {
+      await fetch(`/api/admin/contacts/${contactId}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
+      });
+      setContacts(contacts.filter(c => c._id !== contactId));
+      toast({ title: "Contact submission deleted" });
+    } catch {
+      toast({ title: "Failed to delete contact", variant: "destructive" });
+    }
+  };
+
+  const handleSaveHomepageContent = async (data: InsertHomepageContent) => {
+    try {
+      const payload = { ...data, faqItems };
+      const response = await fetch("/api/admin/homepage-content", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error("Failed to save homepage content");
+      toast({ title: "Homepage content saved successfully" });
+      fetchData();
+    } catch (error) {
+      toast({ 
+        title: "Failed to save homepage content",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const addFaqItem = () => {
+    setFaqItems([...faqItems, { question: "", answer: "" }]);
+  };
+
+  const updateFaqItem = (index: number, field: "question" | "answer", value: string) => {
+    const updated = [...faqItems];
+    updated[index][field] = value;
+    setFaqItems(updated);
+  };
+
+  const removeFaqItem = (index: number) => {
+    setFaqItems(faqItems.filter((_, i) => i !== index));
   };
 
   const handleLogout = () => {
@@ -278,6 +404,28 @@ export default function Admin() {
     }
   };
 
+  const handleSaveSiteSettings = async (data: InsertSiteSettings) => {
+    try {
+      const response = await fetch("/api/admin/site-settings", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to save site settings");
+      toast({ title: "Site settings saved successfully" });
+      fetchData();
+    } catch (error) {
+      toast({ 
+        title: "Failed to save site settings",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive" 
+      });
+    }
+  };
+
   const handleTestImap = async () => {
     setTestingImap(true);
     try {
@@ -315,6 +463,38 @@ export default function Admin() {
       });
     } finally {
       setTestingSmtp(false);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!testEmailRecipient.trim()) {
+      toast({ title: "Please enter a recipient email address", variant: "destructive" });
+      return;
+    }
+    setSendingTestEmail(true);
+    try {
+      const response = await fetch("/api/admin/test/smtp/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify({ recipient: testEmailRecipient }),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to send test email");
+      }
+      toast({ title: "Test email sent successfully!" });
+      setTestEmailRecipient("");
+    } catch (error) {
+      toast({ 
+        title: "Failed to send test email",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive" 
+      });
+    } finally {
+      setSendingTestEmail(false);
     }
   };
 
@@ -510,6 +690,9 @@ export default function Admin() {
       slug: blog.slug,
       content: blog.content,
       excerpt: blog.excerpt,
+      featuredImage: blog.featuredImage || "",
+      metaTitle: blog.metaTitle || "",
+      metaDescription: blog.metaDescription || "",
       isPublished: blog.isPublished,
     });
     setShowBlogDialog(true);
@@ -605,6 +788,18 @@ export default function Admin() {
             <TabsTrigger value="ads" data-testid="admin-tab-ads">
               <Megaphone className="h-4 w-4 mr-2 hidden sm:inline" />
               Ads
+            </TabsTrigger>
+            <TabsTrigger value="site" data-testid="admin-tab-site">
+              <Globe className="h-4 w-4 mr-2 hidden sm:inline" />
+              Site
+            </TabsTrigger>
+            <TabsTrigger value="contacts" data-testid="admin-tab-contacts">
+              <MessageSquare className="h-4 w-4 mr-2 hidden sm:inline" />
+              Contacts
+            </TabsTrigger>
+            <TabsTrigger value="homepage" data-testid="admin-tab-homepage">
+              <Home className="h-4 w-4 mr-2 hidden sm:inline" />
+              Homepage
             </TabsTrigger>
             <TabsTrigger value="logs" data-testid="admin-tab-logs">
               <FileText className="h-4 w-4 mr-2 hidden sm:inline" />
@@ -908,6 +1103,30 @@ export default function Admin() {
                   </form>
                 </Form>
               </Card>
+
+              <Card className="p-6 mt-6">
+                <h3 className="text-lg font-semibold mb-4">Send Test Email</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Send a test email to verify your SMTP configuration is working correctly.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    placeholder="recipient@example.com"
+                    value={testEmailRecipient}
+                    onChange={(e) => setTestEmailRecipient(e.target.value)}
+                    data-testid="input-test-email-recipient"
+                  />
+                  <Button 
+                    onClick={handleSendTestEmail}
+                    disabled={sendingTestEmail || !testEmailRecipient.trim()}
+                    data-testid="button-send-test-email"
+                  >
+                    <Send className={`h-4 w-4 mr-2 ${sendingTestEmail ? "animate-spin" : ""}`} />
+                    {sendingTestEmail ? "Sending..." : "Send Test Email"}
+                  </Button>
+                </div>
+              </Card>
             </div>
           </TabsContent>
 
@@ -1175,18 +1394,61 @@ export default function Admin() {
                       />
                       <FormField
                         control={blogForm.control}
+                        name="featuredImage"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Featured Image URL</FormLabel>
+                            <FormControl>
+                              <Input placeholder="https://example.com/image.jpg" data-testid="input-blog-featured-image" {...field} />
+                            </FormControl>
+                            <FormDescription>URL of the featured image for this post</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <FormField
+                          control={blogForm.control}
+                          name="metaTitle"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Meta Title (SEO)</FormLabel>
+                              <FormControl>
+                                <Input placeholder="SEO title" data-testid="input-blog-meta-title" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={blogForm.control}
+                          name="metaDescription"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Meta Description (SEO)</FormLabel>
+                              <FormControl>
+                                <Input placeholder="SEO description" data-testid="input-blog-meta-description" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <FormField
+                        control={blogForm.control}
                         name="content"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Content</FormLabel>
                             <FormControl>
                               <Textarea 
-                                placeholder="Write your post content..." 
-                                className="min-h-[200px]"
+                                placeholder="Write your post content... (Supports HTML)" 
+                                className="min-h-[200px] font-mono text-sm"
                                 data-testid="input-blog-content"
                                 {...field} 
                               />
                             </FormControl>
+                            <FormDescription>You can use HTML tags for rich formatting</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1377,7 +1639,7 @@ export default function Admin() {
               <div>
                 <h2 className="text-xl font-semibold">Ad Management</h2>
                 <p className="text-sm text-muted-foreground">
-                  Manage advertisement code snippets
+                  Manage advertisement code snippets for monetization
                 </p>
               </div>
               <Dialog open={showAdDialog} onOpenChange={(open) => {
@@ -1479,6 +1741,51 @@ export default function Admin() {
               </Dialog>
             </div>
 
+            {/* Recommended Ad Sizes Guide */}
+            <Card className="p-6">
+              <h3 className="font-semibold mb-4">Recommended Ad Sizes</h3>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="border rounded-md p-4 text-center">
+                  <div className="bg-muted rounded flex items-center justify-center mx-auto mb-2" style={{ width: "145px", height: "18px" }}>
+                    <span className="text-xs text-muted-foreground">728x90</span>
+                  </div>
+                  <p className="text-sm font-medium">Leaderboard</p>
+                  <p className="text-xs text-muted-foreground">728 x 90 px</p>
+                  <p className="text-xs text-muted-foreground mt-1">Best for: Header, Footer</p>
+                </div>
+                <div className="border rounded-md p-4 text-center">
+                  <div className="bg-muted rounded flex items-center justify-center mx-auto mb-2" style={{ width: "60px", height: "50px" }}>
+                    <span className="text-xs text-muted-foreground">300x250</span>
+                  </div>
+                  <p className="text-sm font-medium">Medium Rectangle</p>
+                  <p className="text-xs text-muted-foreground">300 x 250 px</p>
+                  <p className="text-xs text-muted-foreground mt-1">Best for: Sidebar, Content</p>
+                </div>
+                <div className="border rounded-md p-4 text-center">
+                  <div className="bg-muted rounded flex items-center justify-center mx-auto mb-2" style={{ width: "32px", height: "100px" }}>
+                    <span className="text-xs text-muted-foreground rotate-90 whitespace-nowrap">160x600</span>
+                  </div>
+                  <p className="text-sm font-medium">Wide Skyscraper</p>
+                  <p className="text-xs text-muted-foreground">160 x 600 px</p>
+                  <p className="text-xs text-muted-foreground mt-1">Best for: Sidebar</p>
+                </div>
+                <div className="border rounded-md p-4 text-center">
+                  <div className="bg-muted rounded flex items-center justify-center mx-auto mb-2" style={{ width: "64px", height: "20px" }}>
+                    <span className="text-xs text-muted-foreground">320x100</span>
+                  </div>
+                  <p className="text-sm font-medium">Mobile Banner</p>
+                  <p className="text-xs text-muted-foreground">320 x 100 px</p>
+                  <p className="text-xs text-muted-foreground mt-1">Best for: Mobile Header</p>
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-muted/50 rounded-md">
+                <p className="text-sm text-muted-foreground">
+                  <strong>Tip:</strong> Use Google AdSense, Media.net, or any ad network that provides HTML/JavaScript code. 
+                  Paste the complete ad code in the "Ad Code" field when creating an ad. Toggle "Active" to show/hide ads.
+                </p>
+              </div>
+            </Card>
+
             <Card className="overflow-hidden">
               <Table>
                 <TableHeader>
@@ -1493,7 +1800,7 @@ export default function Admin() {
                   {ads.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center py-12 text-muted-foreground">
-                        No ads configured
+                        No ads configured yet. Click "Add Ad" to get started.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -1534,6 +1841,373 @@ export default function Admin() {
                 </TableBody>
               </Table>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="site" className="space-y-6">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <h2 className="text-xl font-semibold">Site Settings</h2>
+                <p className="text-sm text-muted-foreground">
+                  Configure general site information and SEO settings
+                </p>
+              </div>
+            </div>
+
+            <Card className="p-6">
+              <Form {...siteSettingsForm}>
+                <form onSubmit={siteSettingsForm.handleSubmit(handleSaveSiteSettings)} className="space-y-6">
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <FormField
+                      control={siteSettingsForm.control}
+                      name="siteName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Site Name</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="TempMail" 
+                              data-testid="input-site-name"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>The name of your website</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={siteSettingsForm.control}
+                      name="siteLogo"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Site Logo URL</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="https://example.com/logo.png" 
+                              data-testid="input-site-logo"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>URL of your site logo image</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-sm text-muted-foreground">SEO Settings</h4>
+                    <FormField
+                      control={siteSettingsForm.control}
+                      name="defaultMetaTitle"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Default Meta Title</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="TempMail - Free Temporary Email Service" 
+                              data-testid="input-default-meta-title"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>Default title for SEO (shown in browser tabs and search results)</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={siteSettingsForm.control}
+                      name="defaultMetaDescription"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Default Meta Description</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Create disposable email addresses instantly..." 
+                              className="min-h-[80px]"
+                              data-testid="input-default-meta-description"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>Default description for SEO (shown in search results)</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <Button type="submit" data-testid="button-save-site-settings">
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Site Settings
+                  </Button>
+                </form>
+              </Form>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="contacts" className="space-y-6">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <h2 className="text-xl font-semibold">Contact Submissions</h2>
+                <p className="text-sm text-muted-foreground">
+                  View and manage contact form submissions
+                </p>
+              </div>
+            </div>
+
+            <Card className="overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {contacts.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                        No contact submissions yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    contacts.map((contact) => (
+                      <TableRow key={contact._id} data-testid={`row-contact-${contact._id}`}>
+                        <TableCell className="font-medium">{contact.name}</TableCell>
+                        <TableCell>{contact.email}</TableCell>
+                        <TableCell>{contact.subject}</TableCell>
+                        <TableCell>{new Date(contact.createdAt).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost"
+                                  data-testid={`button-view-contact-${contact._id}`}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Contact Message</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">From</p>
+                                    <p className="font-medium">{contact.name} ({contact.email})</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">Subject</p>
+                                    <p className="font-medium">{contact.subject}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">Message</p>
+                                    <p className="whitespace-pre-wrap">{contact.message}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">Received</p>
+                                    <p>{new Date(contact.createdAt).toLocaleString()}</p>
+                                  </div>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                            <Button 
+                              size="icon" 
+                              variant="ghost"
+                              onClick={() => handleDeleteContact(contact._id)}
+                              data-testid={`button-delete-contact-${contact._id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="homepage" className="space-y-6">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <h2 className="text-xl font-semibold">Homepage Content</h2>
+                <p className="text-sm text-muted-foreground">
+                  Manage hero section, stats labels, and FAQ items
+                </p>
+              </div>
+            </div>
+
+            <Form {...homepageForm}>
+              <form onSubmit={homepageForm.handleSubmit(handleSaveHomepageContent)} className="space-y-6">
+                <Card className="p-6">
+                  <h3 className="text-lg font-semibold mb-4">Hero Section</h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FormField
+                      control={homepageForm.control}
+                      name="heroContent.title"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Title</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Instant Disposable Email" data-testid="input-hero-title" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={homepageForm.control}
+                      name="heroContent.generateButtonText"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Button Text</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Generate Email" data-testid="input-hero-button" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={homepageForm.control}
+                      name="heroContent.subtitle"
+                      render={({ field }) => (
+                        <FormItem className="md:col-span-2">
+                          <FormLabel>Subtitle</FormLabel>
+                          <FormControl>
+                            <Textarea placeholder="Protect your privacy..." data-testid="input-hero-subtitle" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <h3 className="text-lg font-semibold mb-4">Stats Labels</h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FormField
+                      control={homepageForm.control}
+                      name="statsContent.emailsCreatedLabel"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Emails Created Label</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Emails Created" data-testid="input-stats-emails" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={homepageForm.control}
+                      name="statsContent.messagesReceivedLabel"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Messages Received Label</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Messages Received" data-testid="input-stats-messages" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={homepageForm.control}
+                      name="statsContent.activeUsersLabel"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Active Users Label</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Active Users" data-testid="input-stats-users" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={homepageForm.control}
+                      name="statsContent.uptimeLabel"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Uptime Label</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Uptime" data-testid="input-stats-uptime" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+                    <h3 className="text-lg font-semibold">FAQ Items</h3>
+                    <Button type="button" variant="outline" onClick={addFaqItem} data-testid="button-add-faq">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add FAQ
+                    </Button>
+                  </div>
+                  <div className="space-y-4">
+                    {faqItems.length === 0 ? (
+                      <p className="text-muted-foreground text-center py-8">
+                        No FAQ items yet. Click "Add FAQ" to create one.
+                      </p>
+                    ) : (
+                      faqItems.map((item, index) => (
+                        <Card key={index} className="p-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 space-y-4">
+                              <div>
+                                <FormLabel>Question</FormLabel>
+                                <Input
+                                  value={item.question}
+                                  onChange={(e) => updateFaqItem(index, "question", e.target.value)}
+                                  placeholder="Enter question..."
+                                  data-testid={`input-faq-question-${index}`}
+                                />
+                              </div>
+                              <div>
+                                <FormLabel>Answer</FormLabel>
+                                <Textarea
+                                  value={item.answer}
+                                  onChange={(e) => updateFaqItem(index, "answer", e.target.value)}
+                                  placeholder="Enter answer..."
+                                  data-testid={`input-faq-answer-${index}`}
+                                />
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => removeFaqItem(index)}
+                              data-testid={`button-remove-faq-${index}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                </Card>
+
+                <Button type="submit" data-testid="button-save-homepage">
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Homepage Content
+                </Button>
+              </form>
+            </Form>
           </TabsContent>
 
           <TabsContent value="logs" className="space-y-6">

@@ -194,6 +194,9 @@ export interface BlogPost {
   slug: string;
   content: string;
   excerpt: string;
+  featuredImage: string;
+  metaTitle: string;
+  metaDescription: string;
   author: string;
   isPublished: boolean;
   createdAt: Date;
@@ -205,6 +208,9 @@ export const insertBlogPostSchema = z.object({
   slug: z.string().min(1, "Slug is required"),
   content: z.string().min(1, "Content is required"),
   excerpt: z.string().optional().default(""),
+  featuredImage: z.string().optional().default(""),
+  metaTitle: z.string().optional().default(""),
+  metaDescription: z.string().optional().default(""),
   isPublished: z.boolean().default(false),
 });
 
@@ -263,6 +269,92 @@ export const appSettingsSchema = z.object({
 });
 
 export type InsertAppSettings = z.infer<typeof appSettingsSchema>;
+
+// Site Settings Schema (General settings)
+export interface SiteSettings {
+  _id: string;
+  siteName: string;
+  siteLogo: string;
+  defaultMetaTitle: string;
+  defaultMetaDescription: string;
+  updatedAt: Date;
+}
+
+export const siteSettingsSchema = z.object({
+  siteName: z.string().min(1, "Site name is required").default("TempMail"),
+  siteLogo: z.string().optional().default(""),
+  defaultMetaTitle: z.string().optional().default("TempMail - Free Temporary Email Service"),
+  defaultMetaDescription: z.string().optional().default("Create disposable email addresses instantly. Protect your privacy with our free temporary email service."),
+});
+
+export type InsertSiteSettings = z.infer<typeof siteSettingsSchema>;
+
+// Contact Form Submission Schema
+export interface ContactSubmission {
+  _id: string;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  isRead: boolean;
+  createdAt: Date;
+}
+
+export const contactSubmissionSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Invalid email address"),
+  subject: z.string().min(3, "Subject must be at least 3 characters"),
+  message: z.string().min(10, "Message must be at least 10 characters"),
+});
+
+export type InsertContactSubmission = z.infer<typeof contactSubmissionSchema>;
+
+// Homepage Content Schema
+export interface HomepageContent {
+  _id: string;
+  faqItems: FAQItem[];
+  statsContent: StatsContent;
+  heroContent: HeroContent;
+  updatedAt: Date;
+}
+
+export interface FAQItem {
+  question: string;
+  answer: string;
+}
+
+export interface StatsContent {
+  emailsCreatedLabel: string;
+  messagesReceivedLabel: string;
+  activeUsersLabel: string;
+  uptimeLabel: string;
+}
+
+export interface HeroContent {
+  title: string;
+  subtitle: string;
+  generateButtonText: string;
+}
+
+export const homepageContentSchema = z.object({
+  faqItems: z.array(z.object({
+    question: z.string(),
+    answer: z.string(),
+  })).optional(),
+  statsContent: z.object({
+    emailsCreatedLabel: z.string(),
+    messagesReceivedLabel: z.string(),
+    activeUsersLabel: z.string(),
+    uptimeLabel: z.string(),
+  }).optional(),
+  heroContent: z.object({
+    title: z.string(),
+    subtitle: z.string(),
+    generateButtonText: z.string(),
+  }).optional(),
+});
+
+export type InsertHomepageContent = z.infer<typeof homepageContentSchema>;
 
 // API Response types
 export interface AuthResponse {

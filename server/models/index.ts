@@ -90,6 +90,9 @@ const BlogPostSchema = new mongoose.Schema({
   slug: { type: String, required: true, unique: true },
   content: { type: String, required: true },
   excerpt: { type: String, default: "" },
+  featuredImage: { type: String, default: "" },
+  metaTitle: { type: String, default: "" },
+  metaDescription: { type: String, default: "" },
   author: { type: String, default: "Admin" },
   isPublished: { type: Boolean, default: false },
 }, { timestamps: true });
@@ -113,6 +116,39 @@ const AppSettingsSchema = new mongoose.Schema({
   soundNotificationsEnabled: { type: Boolean, default: true },
 }, { timestamps: true });
 
+const SiteSettingsSchema = new mongoose.Schema({
+  siteName: { type: String, default: "TempMail" },
+  siteLogo: { type: String, default: "" },
+  defaultMetaTitle: { type: String, default: "TempMail - Free Temporary Email Service" },
+  defaultMetaDescription: { type: String, default: "Create disposable email addresses instantly. Protect your privacy with our free temporary email service." },
+}, { timestamps: true });
+
+const ContactSubmissionSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true },
+  subject: { type: String, required: true },
+  message: { type: String, required: true },
+  isRead: { type: Boolean, default: false },
+}, { timestamps: true });
+
+const HomepageContentSchema = new mongoose.Schema({
+  faqItems: [{
+    question: String,
+    answer: String,
+  }],
+  statsContent: {
+    emailsCreatedLabel: { type: String, default: "Emails Created" },
+    messagesReceivedLabel: { type: String, default: "Messages Received" },
+    activeUsersLabel: { type: String, default: "Active Users" },
+    uptimeLabel: { type: String, default: "Uptime" },
+  },
+  heroContent: {
+    title: { type: String, default: "Instant Temporary Email" },
+    subtitle: { type: String, default: "Protect your privacy with disposable email addresses" },
+    generateButtonText: { type: String, default: "Generate Email Address" },
+  },
+}, { timestamps: true });
+
 export const User = mongoose.model("User", UserSchema);
 export const Domain = mongoose.model("Domain", DomainSchema);
 export const Mailbox = mongoose.model("Mailbox", MailboxSchema);
@@ -125,3 +161,6 @@ export const BlogPost = mongoose.model("BlogPost", BlogPostSchema);
 export const PageContent = mongoose.model("PageContent", PageContentSchema);
 export const AdSnippet = mongoose.model("AdSnippet", AdSnippetSchema);
 export const AppSettings = mongoose.model("AppSettings", AppSettingsSchema);
+export const SiteSettings = mongoose.model("SiteSettings", SiteSettingsSchema);
+export const ContactSubmission = mongoose.model("ContactSubmission", ContactSubmissionSchema);
+export const HomepageContent = mongoose.model("HomepageContent", HomepageContentSchema);

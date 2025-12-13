@@ -3,12 +3,12 @@ import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import { connectDB, isDBConnected } from "./db";
-import { User, Domain, Mailbox, Message, ImapSettings, SmtpSettings, Notification, Log, BlogPost, PageContent, AdSnippet, AppSettings } from "./models/index";
+import { User, Domain, Mailbox, Message, ImapSettings, SmtpSettings, Notification, Log, BlogPost, PageContent, AdSnippet, AppSettings, SiteSettings, ContactSubmission, HomepageContent } from "./models/index";
 import { authMiddleware, adminMiddleware, optionalAuthMiddleware, generateToken, AuthRequest } from "./middleware/auth";
-import { sendVerificationEmail, sendPasswordResetEmail, testSmtpConnection } from "./services/email";
+import { sendVerificationEmail, sendPasswordResetEmail, testSmtpConnection, sendTestEmail, sendWelcomeEmail } from "./services/email";
 import { testImapConnection } from "./services/imap";
 import { startCronJobs } from "./services/cron";
-import { insertUserSchema, loginSchema, insertDomainSchema, imapSettingsSchema, smtpSettingsSchema, insertBlogPostSchema, insertPageContentSchema, insertAdSnippetSchema, appSettingsSchema } from "@shared/schema";
+import { insertUserSchema, loginSchema, insertDomainSchema, imapSettingsSchema, smtpSettingsSchema, insertBlogPostSchema, insertPageContentSchema, insertAdSnippetSchema, appSettingsSchema, siteSettingsSchema, contactSubmissionSchema, homepageContentSchema, resetPasswordSchema } from "@shared/schema";
 
 const DEFAULT_DOMAINS = ["tempmail.io", "quickmail.dev", "disposable.cc"];
 
@@ -98,6 +98,17 @@ export async function registerRoutes(
         details: `User ${username} registered`,
         level: "info",
       });
+
+      // Send welcome email with site branding
+      try {
+        const siteSettings = await SiteSettings.findOne();
+        const siteName = siteSettings?.siteName || "TempMail";
+        const siteLogo = siteSettings?.siteLogo || "";
+        await sendWelcomeEmail(email, username, siteName, siteLogo);
+      } catch (emailError) {
+        console.error("Failed to send welcome email:", emailError);
+        // Don't fail registration if email fails
+      }
 
       res.status(201).json({
         user: {
@@ -831,6 +842,192 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Update settings error:", error);
       res.status(500).json({ message: "Failed to update settings" });
+    }
+  });
+
+  // Site Settings Routes
+  app.get("/api/site-settings", async (req, res) => {
+    try {
+      const settings = await SiteSettings.findOne();
+      res.json(settings || { 
+        siteName: "TempMail", 
+        siteLogo: "", 
+        defaultMetaTitle: "TempMail - Free Temporary Email Service",
+        defaultMetaDescription: "Create disposable email addresses instantly." 
+      });
+    } catch (error) {
+      res.json({ siteName: "TempMail", siteLogo: "", defaultMetaTitle: "", defaultMetaDescription: "" });
+    }
+  });
+
+  app.get("/api/admin/site-settings", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const settings = await SiteSettings.findOne();
+      res.json(settings || { siteName: "TempMail", siteLogo: "", defaultMetaTitle: "", defaultMetaDescription: "" });
+    } catch (error) {
+      res.json({ siteName: "TempMail", siteLogo: "", defaultMetaTitle: "", defaultMetaDescription: "" });
+    }
+  });
+
+  app.put("/api/admin/site-settings", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const parsed = siteSettingsSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid settings", errors: parsed.error.flatten() });
+      }
+      const settings = await SiteSettings.findOneAndUpdate({}, parsed.data, { upsert: true, new: true });
+      await Log.create({ action: "Site settings updated", level: "info" });
+      res.json(settings);
+    } catch (error) {
+      console.error("Update site settings error:", error);
+      res.status(500).json({ message: "Failed to update site settings" });
+    }
+  });
+
+  // Contact Form Routes
+  app.post("/api/contact", async (req, res) => {
+    try {
+      const parsed = contactSubmissionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid submission", errors: parsed.error.flatten() });
+      }
+      const submission = await ContactSubmission.create(parsed.data);
+      res.status(201).json({ message: "Message sent successfully" });
+    } catch (error) {
+      console.error("Contact form error:", error);
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  app.get("/api/admin/contacts", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const contacts = await ContactSubmission.find().sort({ createdAt: -1 });
+      res.json(contacts);
+    } catch (error) {
+      res.json([]);
+    }
+  });
+
+  app.put("/api/admin/contacts/:id/read", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      await ContactSubmission.findByIdAndUpdate(req.params.id, { isRead: true });
+      res.json({ message: "Marked as read" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update" });
+    }
+  });
+
+  app.delete("/api/admin/contacts/:id", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      await ContactSubmission.findByIdAndDelete(req.params.id);
+      res.json({ message: "Contact deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete contact" });
+    }
+  });
+
+  // Homepage Content Routes
+  app.get("/api/homepage-content", async (req, res) => {
+    try {
+      const content = await HomepageContent.findOne();
+      res.json(content || {
+        faqItems: [
+          { question: "What is a temporary email?", answer: "A temporary email is a disposable email address that you can use for a short period of time." },
+          { question: "How long do emails last?", answer: "Emails are kept for 5 days by default, but this can be configured." },
+          { question: "Is it free to use?", answer: "Yes, our service is completely free to use." },
+        ],
+        statsContent: {
+          emailsCreatedLabel: "Emails Created",
+          messagesReceivedLabel: "Messages Received",
+          activeUsersLabel: "Active Users",
+          uptimeLabel: "Uptime",
+        },
+        heroContent: {
+          title: "Instant Temporary Email",
+          subtitle: "Protect your privacy with disposable email addresses",
+          generateButtonText: "Generate Email Address",
+        },
+      });
+    } catch (error) {
+      res.json({});
+    }
+  });
+
+  app.get("/api/admin/homepage-content", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const content = await HomepageContent.findOne();
+      res.json(content || {});
+    } catch (error) {
+      res.json({});
+    }
+  });
+
+  app.put("/api/admin/homepage-content", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const content = await HomepageContent.findOneAndUpdate({}, req.body, { upsert: true, new: true });
+      await Log.create({ action: "Homepage content updated", level: "info" });
+      res.json(content);
+    } catch (error) {
+      console.error("Update homepage content error:", error);
+      res.status(500).json({ message: "Failed to update homepage content" });
+    }
+  });
+
+  // Send Test Email Route
+  app.post("/api/admin/test/smtp/send", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email address is required" });
+      }
+      const success = await sendTestEmail(email);
+      if (success) {
+        res.json({ message: "Test email sent successfully" });
+      } else {
+        res.status(400).json({ message: "Failed to send test email" });
+      }
+    } catch (error) {
+      console.error("Send test email error:", error);
+      res.status(500).json({ message: "Failed to send test email" });
+    }
+  });
+
+  // Password Reset Routes
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const parsed = resetPasswordSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input", errors: parsed.error.flatten() });
+      }
+
+      const { token, password } = parsed.data;
+      const user = await User.findOne({ 
+        resetToken: token, 
+        resetTokenExpiry: { $gt: new Date() } 
+      });
+
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired reset token" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      await User.findByIdAndUpdate(user._id, { 
+        password: hashedPassword, 
+        resetToken: null, 
+        resetTokenExpiry: null 
+      });
+
+      await Log.create({
+        action: "Password reset",
+        userId: user._id,
+        details: `User ${user.username} reset their password`,
+        level: "info",
+      });
+
+      res.json({ message: "Password reset successfully" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ message: "Failed to reset password" });
     }
   });
 
