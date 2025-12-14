@@ -133,7 +133,7 @@ export function Inbox() {
 
   return (
     <section className="py-8 md:py-12">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full">
         <Card className="overflow-hidden min-h-[400px]">
           {selectedMessage ? (
             <MessageView 

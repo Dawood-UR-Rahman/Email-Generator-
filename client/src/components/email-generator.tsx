@@ -249,6 +249,15 @@ export function EmailGenerator() {
                   Delete
                 </Button>
 
+                <Button
+                  variant="outline"
+                  onClick={handleOpenCustomEmailDialog}
+                  data-testid="button-custom-email-inline"
+                >
+                  <Edit3 className="h-4 w-4 mr-2" />
+                  Custom Email
+                </Button>
+
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" data-testid="button-change-domain">
