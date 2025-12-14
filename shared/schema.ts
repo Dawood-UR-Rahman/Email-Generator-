@@ -197,6 +197,7 @@ export interface BlogPost {
   featuredImage: string;
   metaTitle: string;
   metaDescription: string;
+  metaKeywords: string;
   author: string;
   isPublished: boolean;
   createdAt: Date;
@@ -211,6 +212,7 @@ export const insertBlogPostSchema = z.object({
   featuredImage: z.string().optional().default(""),
   metaTitle: z.string().optional().default(""),
   metaDescription: z.string().optional().default(""),
+  metaKeywords: z.string().optional().default(""),
   isPublished: z.boolean().default(false),
 });
 

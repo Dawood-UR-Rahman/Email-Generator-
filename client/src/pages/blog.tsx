@@ -63,10 +63,18 @@ export default function Blog() {
                         className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer h-full"
                         data-testid={`blog-card-${post._id}`}
                       >
-                        <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-                          <span className="text-6xl font-bold text-primary/20">
-                            {post.title.charAt(0)}
-                          </span>
+                        <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center overflow-hidden">
+                          {post.featuredImage ? (
+                            <img 
+                              src={post.featuredImage} 
+                              alt={post.title}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-6xl font-bold text-primary/20">
+                              {post.title.charAt(0)}
+                            </span>
+                          )}
                         </div>
                         <div className="p-6">
                           <div className="flex items-center gap-2 mb-3">

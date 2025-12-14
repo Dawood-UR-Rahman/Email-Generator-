@@ -2,7 +2,39 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import { connectDB, isDBConnected } from "./db";
+
+const uploadsDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (extname && mimetype) {
+      return cb(null, true);
+    }
+    cb(new Error("Only image files are allowed"));
+  },
+});
 import { User, Domain, Mailbox, Message, ImapSettings, SmtpSettings, Notification, Log, BlogPost, PageContent, AdSnippet, AppSettings, SiteSettings, ContactSubmission, HomepageContent } from "./models/index";
 import { authMiddleware, adminMiddleware, optionalAuthMiddleware, generateToken, AuthRequest } from "./middleware/auth";
 import { sendVerificationEmail, sendPasswordResetEmail, testSmtpConnection, sendTestEmail, sendWelcomeEmail } from "./services/email";
@@ -63,6 +95,23 @@ export async function registerRoutes(
       db: isDBConnected() ? "connected" : "disconnected",
       timestamp: new Date().toISOString(),
     });
+  });
+
+  // Serve uploaded files
+  app.use("/uploads", (await import("express")).default.static(uploadsDir));
+
+  // Image upload endpoint
+  app.post("/api/admin/upload", authMiddleware as any, adminMiddleware as any, upload.single("image"), (req: AuthRequest, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+      const imageUrl = `/uploads/${req.file.filename}`;
+      res.json({ url: imageUrl });
+    } catch (error) {
+      console.error("Upload error:", error);
+      res.status(500).json({ message: "Failed to upload image" });
+    }
   });
 
   app.post("/api/auth/register", async (req, res) => {

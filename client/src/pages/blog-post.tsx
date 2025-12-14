@@ -91,10 +91,18 @@ export default function BlogPost() {
                 </Button>
               </Link>
 
-              <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center rounded-xl mb-8">
-                <span className="text-8xl font-bold text-primary/20">
-                  {post.title?.charAt(0) || "B"}
-                </span>
+              <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center rounded-xl mb-8 overflow-hidden">
+                {post.featuredImage ? (
+                  <img 
+                    src={post.featuredImage} 
+                    alt={post.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-8xl font-bold text-primary/20">
+                    {post.title?.charAt(0) || "B"}
+                  </span>
+                )}
               </div>
 
               <div className="flex items-center gap-3 mb-4">

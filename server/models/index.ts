@@ -93,6 +93,7 @@ const BlogPostSchema = new mongoose.Schema({
   featuredImage: { type: String, default: "" },
   metaTitle: { type: String, default: "" },
   metaDescription: { type: String, default: "" },
+  metaKeywords: { type: String, default: "" },
   author: { type: String, default: "Admin" },
   isPublished: { type: Boolean, default: false },
 }, { timestamps: true });
