@@ -96,6 +96,8 @@ export default function Admin() {
   const [showPageDialog, setShowPageDialog] = useState(false);
   const [showAdDialog, setShowAdDialog] = useState(false);
   const [editingBlog, setEditingBlog] = useState<BlogPost | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [editingPage, setEditingPage] = useState<PageContent | null>(null);
   const [editingAd, setEditingAd] = useState<AdSnippet | null>(null);
 
@@ -138,6 +140,7 @@ export default function Admin() {
       featuredImage: "",
       metaTitle: "",
       metaDescription: "",
+      metaKeywords: "",
       isPublished: false,
     },
   });
@@ -683,6 +686,45 @@ export default function Admin() {
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ title: "Invalid file type", description: "Please upload JPEG, PNG, GIF, or WebP images only", variant: "destructive" });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum file size is 5MB", variant: "destructive" });
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch('/api/admin/upload', {
+        method: 'POST',
+        headers: { "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('Upload failed');
+      
+      const data = await response.json();
+      blogForm.setValue('featuredImage', data.url);
+      setImagePreview(data.url);
+      toast({ title: "Image uploaded successfully" });
+    } catch (error) {
+      toast({ title: "Failed to upload image", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const openEditBlog = (blog: BlogPost) => {
     setEditingBlog(blog);
     blogForm.reset({
@@ -693,8 +735,10 @@ export default function Admin() {
       featuredImage: blog.featuredImage || "",
       metaTitle: blog.metaTitle || "",
       metaDescription: blog.metaDescription || "",
+      metaKeywords: blog.metaKeywords || "",
       isPublished: blog.isPublished,
     });
+    setImagePreview(blog.featuredImage || null);
     setShowBlogDialog(true);
   };
 
@@ -1339,6 +1383,7 @@ export default function Admin() {
                 if (!open) {
                   setEditingBlog(null);
                   blogForm.reset();
+                  setImagePreview(null);
                 }
               }}>
                 <DialogTrigger asChild>
@@ -1397,11 +1442,46 @@ export default function Admin() {
                         name="featuredImage"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Featured Image URL</FormLabel>
-                            <FormControl>
-                              <Input placeholder="https://example.com/image.jpg" data-testid="input-blog-featured-image" {...field} />
-                            </FormControl>
-                            <FormDescription>URL of the featured image for this post</FormDescription>
+                            <FormLabel>Featured Image</FormLabel>
+                            <div className="space-y-3">
+                              {(imagePreview || field.value) && (
+                                <div className="relative w-full h-40 rounded-lg overflow-hidden border bg-muted">
+                                  <img 
+                                    src={imagePreview || field.value} 
+                                    alt="Preview" 
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="icon"
+                                    className="absolute top-2 right-2 h-8 w-8"
+                                    onClick={() => {
+                                      field.onChange("");
+                                      setImagePreview(null);
+                                    }}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
+                              <div className="flex gap-2">
+                                <FormControl>
+                                  <Input
+                                    type="file"
+                                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                                    onChange={handleImageUpload}
+                                    disabled={uploadingImage}
+                                    className="cursor-pointer"
+                                    data-testid="input-blog-featured-image"
+                                  />
+                                </FormControl>
+                              </div>
+                              <input type="hidden" {...field} />
+                            </div>
+                            <FormDescription>
+                              {uploadingImage ? "Uploading..." : "Upload JPEG, PNG, GIF, or WebP (max 5MB)"}
+                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1434,6 +1514,20 @@ export default function Admin() {
                           )}
                         />
                       </div>
+                      <FormField
+                        control={blogForm.control}
+                        name="metaKeywords"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Meta Keywords (SEO)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="keyword1, keyword2, keyword3" data-testid="input-blog-meta-keywords" {...field} />
+                            </FormControl>
+                            <FormDescription>Comma-separated keywords for SEO</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                       <FormField
                         control={blogForm.control}
                         name="content"
