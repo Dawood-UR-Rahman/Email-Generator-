@@ -6,7 +6,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { SiteSettings } from "@shared/schema";
+import type { SiteSettings, SocialLinks } from "@shared/schema";
 
 const quickLinks = [
   { label: "Home", href: "/" },
@@ -65,7 +65,7 @@ export function Footer() {
   const footerLogo = siteSettings?.footerLogo || siteSettings?.siteLogo;
   const footerText = siteSettings?.footerText || "Free temporary email addresses for protecting your privacy online. No registration required.";
   const copyrightText = siteSettings?.copyrightText || `${new Date().getFullYear()} ${siteName}. All rights reserved.`;
-  const socialLinks = siteSettings?.socialLinks || {};
+  const socialLinks: Partial<SocialLinks> = siteSettings?.socialLinks || {};
 
   return (
     <footer className="bg-foreground text-background py-12 md:py-16">

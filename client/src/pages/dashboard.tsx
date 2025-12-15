@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { 
   Mail, Globe, Inbox, Bell, Settings, LogOut, 
   Plus, Trash2, RefreshCw, Check, X, Copy, 
   ChevronRight, AlertCircle, CheckCircle
 } from "lucide-react";
+import type { DomainInstructions, DomainLimits } from "@shared/schema";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -134,6 +135,31 @@ export default function Dashboard() {
   const [showAddDomain, setShowAddDomain] = useState(false);
   const [userDomains, setUserDomains] = useState<Domain[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [domainInstructions, setDomainInstructions] = useState<DomainInstructions | null>(null);
+  const [domainLimits, setDomainLimits] = useState<DomainLimits | null>(null);
+  const [domainCount, setDomainCount] = useState(0);
+
+  useEffect(() => {
+    const fetchDomainData = async () => {
+      try {
+        const headers = { "Authorization": `Bearer ${localStorage.getItem("authToken")}` };
+        const [instructionsRes, limitsRes, countRes] = await Promise.all([
+          fetch("/api/domain-instructions"),
+          fetch("/api/domain-limits"),
+          fetch("/api/user/domain-count", { headers }),
+        ]);
+        if (instructionsRes.ok) setDomainInstructions(await instructionsRes.json());
+        if (limitsRes.ok) setDomainLimits(await limitsRes.json());
+        if (countRes.ok) {
+          const data = await countRes.json();
+          setDomainCount(data.count || 0);
+        }
+      } catch (e) {
+        console.error("Failed to fetch domain data:", e);
+      }
+    };
+    if (isAuthenticated) fetchDomainData();
+  }, [isAuthenticated]);
 
   const form = useForm<DomainForm>({
     resolver: zodResolver(domainSchema),
@@ -147,7 +173,17 @@ export default function Dashboard() {
 
   const customDomains = domains.filter(d => d.type === "custom" && d.userId === user?._id);
 
+  const canAddDomain = !domainLimits || domainCount < (domainLimits.maxFreeCustomDomains || 1);
+
   const handleAddDomain = async (data: DomainForm) => {
+    if (!canAddDomain) {
+      toast({
+        title: "Domain limit reached",
+        description: domainLimits?.limitMessage || "Please upgrade to add more domains.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       const response = await fetch("/api/domain/add", {
         method: "POST",
@@ -158,10 +194,14 @@ export default function Dashboard() {
         body: JSON.stringify(data),
       });
 
-      if (!response.ok) throw new Error("Failed to add domain");
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to add domain");
+      }
 
       const newDomain = await response.json();
       setUserDomains([...userDomains, newDomain]);
+      setDomainCount(domainCount + 1);
       setShowAddDomain(false);
       form.reset();
       toast({
@@ -258,9 +298,9 @@ export default function Dashboard() {
               </div>
               <Dialog open={showAddDomain} onOpenChange={setShowAddDomain}>
                 <DialogTrigger asChild>
-                  <Button data-testid="button-add-domain">
+                  <Button data-testid="button-add-domain" disabled={!canAddDomain}>
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Domain
+                    Add Domain {domainLimits && `(${domainCount}/${domainLimits.maxFreeCustomDomains})`}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
@@ -297,28 +337,40 @@ export default function Dashboard() {
 
             <Card className="p-6">
               <h3 className="font-semibold mb-4">How to Connect Your Domain</h3>
-              <ol className="space-y-3 text-sm text-muted-foreground">
-                <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">1</span>
-                  <span>Add your domain using the form above</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">2</span>
-                  <span>Copy the TXT verification record provided</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">3</span>
-                  <span>Add the TXT record to your domain's DNS settings</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">4</span>
-                  <span>Add an MX record pointing to our mail server</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">5</span>
-                  <span>Wait for verification (usually within 24 hours)</span>
-                </li>
-              </ol>
+              {domainInstructions?.content ? (
+                <div 
+                  className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground"
+                  dangerouslySetInnerHTML={{ __html: domainInstructions.content }}
+                />
+              ) : (
+                <ol className="space-y-3 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">1</span>
+                    <span>Add your domain using the form above</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">2</span>
+                    <span>Copy the TXT verification record provided</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">3</span>
+                    <span>Add the TXT record to your domain's DNS settings</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">4</span>
+                    <span>Add an MX record pointing to our mail server</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">5</span>
+                    <span>Wait for verification (usually within 24 hours)</span>
+                  </li>
+                </ol>
+              )}
+              {!canAddDomain && domainLimits?.limitMessage && (
+                <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">{domainLimits.limitMessage}</p>
+                </div>
+              )}
             </Card>
 
             {customDomains.length > 0 || userDomains.length > 0 ? (

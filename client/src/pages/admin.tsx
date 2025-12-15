@@ -5,7 +5,7 @@ import {
   Save, TestTube, Check, X, Send, Trash2, RefreshCw,
   LogOut, AlertCircle, CheckCircle, Eye, EyeOff,
   Plus, Star, Edit, BookOpen, Layout, Megaphone, MessageSquare, Home,
-  Download, MailCheck
+  Download, MailCheck, Database, Gauge, Info, UserCog
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -61,12 +61,14 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { 
   imapSettingsSchema, smtpSettingsSchema, insertDomainSchema, 
   insertBlogPostSchema, insertPageContentSchema, insertAdSnippetSchema, appSettingsSchema,
-  siteSettingsSchema, homepageContentSchema, emailTemplateSchema,
+  siteSettingsSchema, homepageContentSchema, emailTemplateSchema, storageSettingsSchema, domainLimitsSchema, domainInstructionsSchema,
   type InsertImapSettings, type InsertSmtpSettings, type InsertDomain,
   type InsertBlogPost, type InsertPageContent, type InsertAdSnippet, type InsertAppSettings,
   type InsertSiteSettings, type InsertHomepageContent, type InsertEmailTemplate,
+  type InsertStorageSettings, type InsertDomainLimits, type InsertDomainInstructions,
   type User, type Domain, type Log, type BlogPost, type PageContent, type AdSnippet, type AppSettings,
-  type SiteSettings, type ContactSubmission, type HomepageContent, type FAQItem, type EmailTemplate
+  type SiteSettings, type ContactSubmission, type HomepageContent, type FAQItem, type EmailTemplate,
+  type StorageSettings, type DomainLimits, type DomainInstructions
 } from "@shared/schema";
 
 export default function Admin() {
@@ -86,6 +88,12 @@ export default function Admin() {
   const [homepageContent, setHomepageContent] = useState<HomepageContent | null>(null);
   const [faqItems, setFaqItems] = useState<FAQItem[]>([]);
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
+  const [storageSettings, setStorageSettings] = useState<StorageSettings | null>(null);
+  const [domainLimits, setDomainLimits] = useState<DomainLimits | null>(null);
+  const [domainInstructions, setDomainInstructions] = useState<DomainInstructions | null>(null);
+  const [cleaningStorage, setCleaningStorage] = useState(false);
+  const [showEditUserDialog, setShowEditUserDialog] = useState(false);
+  const [editingUser, setEditingUser] = useState<Omit<User, "password"> | null>(null);
   
   const [showImapPassword, setShowImapPassword] = useState(false);
   const [showSmtpPassword, setShowSmtpPassword] = useState(false);
@@ -222,6 +230,31 @@ export default function Admin() {
     },
   });
 
+  const storageSettingsForm = useForm<InsertStorageSettings>({
+    resolver: zodResolver(storageSettingsSchema),
+    defaultValues: {
+      autoDeleteEnabled: true,
+      autoDeleteDays: 7,
+      maxStorageEmails: 10000,
+      maxStorageMessages: 50000,
+    },
+  });
+
+  const domainLimitsForm = useForm<InsertDomainLimits>({
+    resolver: zodResolver(domainLimitsSchema),
+    defaultValues: {
+      maxFreeCustomDomains: 1,
+      limitMessage: "Please purchase a plan to add more custom domains.",
+    },
+  });
+
+  const domainInstructionsForm = useForm<InsertDomainInstructions>({
+    resolver: zodResolver(domainInstructionsSchema),
+    defaultValues: {
+      content: "",
+    },
+  });
+
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) {
       setLocation("/login");
@@ -235,7 +268,7 @@ export default function Admin() {
     const headers = { "Authorization": `Bearer ${token}` };
     
     try {
-      const [domainsRes, blogRes, pagesRes, adsRes, settingsRes, siteSettingsRes, contactsRes, homepageRes, emailTemplatesRes] = await Promise.all([
+      const [domainsRes, blogRes, pagesRes, adsRes, settingsRes, siteSettingsRes, contactsRes, homepageRes, emailTemplatesRes, usersRes, storageRes, limitsRes, instructionsRes] = await Promise.all([
         fetch("/api/admin/domains", { headers }),
         fetch("/api/admin/blog", { headers }),
         fetch("/api/admin/pages", { headers }),
@@ -245,6 +278,10 @@ export default function Admin() {
         fetch("/api/admin/contacts", { headers }),
         fetch("/api/admin/homepage-content", { headers }),
         fetch("/api/admin/email-templates", { headers }),
+        fetch("/api/admin/users", { headers }),
+        fetch("/api/admin/storage-settings", { headers }),
+        fetch("/api/admin/domain-limits", { headers }),
+        fetch("/api/domain-instructions", { headers }),
       ]);
       
       if (domainsRes.ok) {
@@ -314,6 +351,35 @@ export default function Admin() {
       if (emailTemplatesRes.ok) {
         const data = await emailTemplatesRes.json();
         setEmailTemplates(data);
+      }
+      if (usersRes.ok) {
+        const data = await usersRes.json();
+        setUsers(data);
+      }
+      if (storageRes.ok) {
+        const data = await storageRes.json();
+        setStorageSettings(data);
+        storageSettingsForm.reset({
+          autoDeleteEnabled: data.autoDeleteEnabled ?? true,
+          autoDeleteDays: data.autoDeleteDays || 7,
+          maxStorageEmails: data.maxStorageEmails || 10000,
+          maxStorageMessages: data.maxStorageMessages || 50000,
+        });
+      }
+      if (limitsRes.ok) {
+        const data = await limitsRes.json();
+        setDomainLimits(data);
+        domainLimitsForm.reset({
+          maxFreeCustomDomains: data.maxFreeCustomDomains || 1,
+          limitMessage: data.limitMessage || "Please purchase a plan to add more custom domains.",
+        });
+      }
+      if (instructionsRes.ok) {
+        const data = await instructionsRes.json();
+        setDomainInstructions(data);
+        domainInstructionsForm.reset({
+          content: data.content || "",
+        });
       }
     } catch (error) {
       console.error("Failed to fetch data:", error);
@@ -426,6 +492,156 @@ export default function Admin() {
 
   const removeFaqItem = (index: number) => {
     setFaqItems(faqItems.filter((_, i) => i !== index));
+  };
+
+  const handleSaveStorageSettings = async (data: InsertStorageSettings) => {
+    try {
+      const response = await fetch("/api/admin/storage-settings", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to save storage settings");
+      toast({ title: "Storage settings saved successfully" });
+      fetchData();
+    } catch (error) {
+      toast({ 
+        title: "Failed to save storage settings",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const handleCleanupStorage = async () => {
+    setCleaningStorage(true);
+    try {
+      const response = await fetch("/api/admin/storage/cleanup", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
+      });
+      if (!response.ok) throw new Error("Failed to cleanup storage");
+      const data = await response.json();
+      toast({ title: `Cleanup complete: ${data.deletedEmails || 0} emails, ${data.deletedMessages || 0} messages removed` });
+    } catch (error) {
+      toast({ 
+        title: "Failed to cleanup storage",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive" 
+      });
+    } finally {
+      setCleaningStorage(false);
+    }
+  };
+
+  const handleSaveDomainLimits = async (data: InsertDomainLimits) => {
+    try {
+      const response = await fetch("/api/admin/domain-limits", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to save domain limits");
+      toast({ title: "Domain limits saved successfully" });
+      fetchData();
+    } catch (error) {
+      toast({ 
+        title: "Failed to save domain limits",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const handleSaveDomainInstructions = async (data: InsertDomainInstructions) => {
+    try {
+      const response = await fetch("/api/admin/domain-instructions", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to save domain instructions");
+      toast({ title: "Domain instructions saved successfully" });
+      fetchData();
+    } catch (error) {
+      toast({ 
+        title: "Failed to save domain instructions",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const handleEditUser = async (userId: string, data: { username: string; email: string; role: "user" | "admin" }) => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to update user");
+      toast({ title: "User updated successfully" });
+      setShowEditUserDialog(false);
+      setEditingUser(null);
+      fetchData();
+    } catch (error) {
+      toast({ 
+        title: "Failed to update user",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm("Are you sure you want to delete this user?")) return;
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
+      });
+      if (!response.ok) throw new Error("Failed to delete user");
+      toast({ title: "User deleted successfully" });
+      fetchData();
+    } catch (error) {
+      toast({ 
+        title: "Failed to delete user",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const handleLoginAsUser = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/login-as`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
+      });
+      if (!response.ok) throw new Error("Failed to login as user");
+      const data = await response.json();
+      localStorage.setItem("authToken", data.token);
+      toast({ title: "Logged in as user" });
+      setLocation("/dashboard");
+    } catch (error) {
+      toast({ 
+        title: "Failed to login as user",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive" 
+      });
+    }
   };
 
   const handleLogout = () => {
@@ -943,6 +1159,18 @@ export default function Admin() {
               <FileText className="h-4 w-4 mr-2 hidden sm:inline" />
               Logs
             </TabsTrigger>
+            <TabsTrigger value="storage" data-testid="admin-tab-storage">
+              <Database className="h-4 w-4 mr-2 hidden sm:inline" />
+              Storage
+            </TabsTrigger>
+            <TabsTrigger value="domain-limits" data-testid="admin-tab-domain-limits">
+              <Gauge className="h-4 w-4 mr-2 hidden sm:inline" />
+              Limits
+            </TabsTrigger>
+            <TabsTrigger value="domain-instructions" data-testid="admin-tab-domain-instructions">
+              <Info className="h-4 w-4 mr-2 hidden sm:inline" />
+              Instructions
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="settings" className="space-y-6">
@@ -1312,9 +1540,36 @@ export default function Admin() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button size="sm" variant="ghost">
-                              <Send className="h-4 w-4" />
+                          <div className="flex items-center gap-1">
+                            <Button 
+                              size="icon" 
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingUser(u);
+                                setShowEditUserDialog(true);
+                              }}
+                              data-testid={`button-edit-user-${u._id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="icon" 
+                              variant="ghost"
+                              onClick={() => handleDeleteUser(u._id)}
+                              disabled={u._id === user?._id}
+                              data-testid={`button-delete-user-${u._id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                            <Button 
+                              size="icon" 
+                              variant="ghost"
+                              onClick={() => handleLoginAsUser(u._id)}
+                              disabled={u._id === user?._id}
+                              title="Login as user"
+                              data-testid={`button-login-as-${u._id}`}
+                            >
+                              <UserCog className="h-4 w-4" />
                             </Button>
                             <Switch 
                               checked={u.isVerified}
@@ -1328,6 +1583,53 @@ export default function Admin() {
                 </TableBody>
               </Table>
             </Card>
+
+            <Dialog open={showEditUserDialog} onOpenChange={setShowEditUserDialog}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit User</DialogTitle>
+                </DialogHeader>
+                {editingUser && (
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    const form = e.target as HTMLFormElement;
+                    const formData = new FormData(form);
+                    handleEditUser(editingUser._id, {
+                      username: formData.get("username") as string,
+                      email: formData.get("email") as string,
+                      role: formData.get("role") as "user" | "admin",
+                    });
+                  }} className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Username</label>
+                      <Input name="username" defaultValue={editingUser.username} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Email</label>
+                      <Input name="email" type="email" defaultValue={editingUser.email} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Role</label>
+                      <Select name="role" defaultValue={editingUser.role}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="user">User</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <DialogFooter>
+                      <DialogClose asChild>
+                        <Button type="button" variant="outline">Cancel</Button>
+                      </DialogClose>
+                      <Button type="submit" data-testid="button-save-user">Save Changes</Button>
+                    </DialogFooter>
+                  </form>
+                )}
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="domains" className="space-y-6">
@@ -2812,6 +3114,229 @@ export default function Admin() {
                   ))}
                 </ScrollArea>
               )}
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="storage" className="space-y-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold">Storage Management</h2>
+                <p className="text-sm text-muted-foreground">
+                  Configure automatic cleanup and storage limits
+                </p>
+              </div>
+            </div>
+
+            <Card className="p-6">
+              <Form {...storageSettingsForm}>
+                <form onSubmit={storageSettingsForm.handleSubmit(handleSaveStorageSettings)} className="space-y-6">
+                  <FormField
+                    control={storageSettingsForm.control}
+                    name="autoDeleteEnabled"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Auto-Delete Emails</FormLabel>
+                          <FormDescription>Automatically delete old emails and messages</FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-auto-delete"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={storageSettingsForm.control}
+                    name="autoDeleteDays"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Auto-Delete After (Days)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min={1}
+                            max={365}
+                            data-testid="input-auto-delete-days"
+                            {...field}
+                            onChange={e => field.onChange(parseInt(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormDescription>Delete emails older than this many days</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={storageSettingsForm.control}
+                    name="maxStorageEmails"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Max Stored Emails</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min={100}
+                            max={1000000}
+                            data-testid="input-max-emails"
+                            {...field}
+                            onChange={e => field.onChange(parseInt(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormDescription>Maximum number of temporary email addresses to store</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={storageSettingsForm.control}
+                    name="maxStorageMessages"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Max Stored Messages</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min={100}
+                            max={1000000}
+                            data-testid="input-max-messages"
+                            {...field}
+                            onChange={e => field.onChange(parseInt(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormDescription>Maximum number of email messages to store</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex items-center gap-4">
+                    <Button type="submit" data-testid="button-save-storage">
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Settings
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="destructive" 
+                      onClick={handleCleanupStorage}
+                      disabled={cleaningStorage}
+                      data-testid="button-cleanup-storage"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      {cleaningStorage ? "Cleaning..." : "Run Cleanup Now"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="domain-limits" className="space-y-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold">Domain Limits</h2>
+                <p className="text-sm text-muted-foreground">
+                  Set limits for custom domains for free users
+                </p>
+              </div>
+            </div>
+
+            <Card className="p-6">
+              <Form {...domainLimitsForm}>
+                <form onSubmit={domainLimitsForm.handleSubmit(handleSaveDomainLimits)} className="space-y-6">
+                  <FormField
+                    control={domainLimitsForm.control}
+                    name="maxFreeCustomDomains"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Max Custom Domains (Free Users)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min={0}
+                            max={100}
+                            data-testid="input-max-domains"
+                            {...field}
+                            onChange={e => field.onChange(parseInt(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormDescription>Maximum number of custom domains a free user can add (0 = no custom domains allowed)</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={domainLimitsForm.control}
+                    name="limitMessage"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Limit Reached Message</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            rows={3}
+                            placeholder="Message shown when user reaches domain limit"
+                            data-testid="input-limit-message"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>Message displayed when a user reaches their domain limit</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" data-testid="button-save-limits">
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Limits
+                  </Button>
+                </form>
+              </Form>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="domain-instructions" className="space-y-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold">Domain Instructions</h2>
+                <p className="text-sm text-muted-foreground">
+                  Configure the domain setup instructions shown to users
+                </p>
+              </div>
+            </div>
+
+            <Card className="p-6">
+              <Form {...domainInstructionsForm}>
+                <form onSubmit={domainInstructionsForm.handleSubmit(handleSaveDomainInstructions)} className="space-y-6">
+                  <FormField
+                    control={domainInstructionsForm.control}
+                    name="content"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Instructions Content (HTML)</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            rows={15}
+                            placeholder="Enter HTML content for domain setup instructions..."
+                            className="font-mono text-sm"
+                            data-testid="input-instructions-content"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          HTML content displayed in the user dashboard. Use HTML tags for formatting.
+                          Example: &lt;ol&gt;&lt;li&gt;Step 1&lt;/li&gt;&lt;li&gt;Step 2&lt;/li&gt;&lt;/ol&gt;
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" data-testid="button-save-instructions">
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Instructions
+                  </Button>
+                </form>
+              </Form>
             </Card>
           </TabsContent>
         </Tabs>
