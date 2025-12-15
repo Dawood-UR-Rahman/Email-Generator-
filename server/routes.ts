@@ -35,12 +35,12 @@ const upload = multer({
     cb(new Error("Only image files are allowed"));
   },
 });
-import { User, Domain, Mailbox, Message, ImapSettings, SmtpSettings, Notification, Log, BlogPost, PageContent, AdSnippet, AppSettings, SiteSettings, ContactSubmission, HomepageContent, EmailTemplate, NewsletterSubscriber } from "./models/index";
+import { User, Domain, Mailbox, Message, ImapSettings, SmtpSettings, Notification, Log, BlogPost, PageContent, AdSnippet, AppSettings, SiteSettings, ContactSubmission, HomepageContent, EmailTemplate, NewsletterSubscriber, DomainInstructions, StorageSettings, DomainLimits } from "./models/index";
 import { authMiddleware, adminMiddleware, optionalAuthMiddleware, generateToken, AuthRequest } from "./middleware/auth";
 import { sendVerificationEmail, sendPasswordResetEmail, testSmtpConnection, sendTestEmail, sendWelcomeEmail, sendContactNotification, sendNewsletterConfirmation } from "./services/email";
 import { testImapConnection } from "./services/imap";
 import { startCronJobs } from "./services/cron";
-import { insertUserSchema, loginSchema, insertDomainSchema, imapSettingsSchema, smtpSettingsSchema, insertBlogPostSchema, insertPageContentSchema, insertAdSnippetSchema, appSettingsSchema, siteSettingsSchema, contactSubmissionSchema, homepageContentSchema, resetPasswordSchema, emailTemplateSchema, newsletterSubscriberSchema } from "@shared/schema";
+import { insertUserSchema, loginSchema, insertDomainSchema, imapSettingsSchema, smtpSettingsSchema, insertBlogPostSchema, insertPageContentSchema, insertAdSnippetSchema, appSettingsSchema, siteSettingsSchema, contactSubmissionSchema, homepageContentSchema, resetPasswordSchema, emailTemplateSchema, newsletterSubscriberSchema, domainInstructionsSchema, storageSettingsSchema, domainLimitsSchema } from "@shared/schema";
 
 const DEFAULT_DOMAINS = ["tempmail.io", "quickmail.dev", "disposable.cc"];
 
@@ -246,9 +246,25 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/domains", async (req, res) => {
+  app.get("/api/domains", optionalAuthMiddleware as any, async (req: AuthRequest, res) => {
     try {
-      const domains = await Domain.find({ isActive: true, $or: [{ type: "system" }, { isVerified: true }] })
+      const userId = req.user?._id;
+      
+      // Build query: system domains + user's own custom domains (if logged in)
+      const query: any = { 
+        isActive: true,
+        $or: [
+          { type: "system" },
+          { type: "custom", isVerified: true, userId: userId }
+        ]
+      };
+      
+      // If not logged in, only show system domains
+      if (!userId) {
+        query.$or = [{ type: "system" }];
+      }
+      
+      const domains = await Domain.find(query)
         .select("-__v")
         .sort({ type: 1, name: 1 });
 
@@ -1249,6 +1265,231 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Export contacts error:", error);
       res.status(500).json({ message: "Failed to export contacts" });
+    }
+  });
+
+  // Domain Instructions Routes
+  app.get("/api/domain-instructions", async (req, res) => {
+    try {
+      let instructions = await DomainInstructions.findOne();
+      if (!instructions) {
+        instructions = await DomainInstructions.create({});
+      }
+      res.json(instructions);
+    } catch (error) {
+      console.error("Get domain instructions error:", error);
+      res.json({ content: "" });
+    }
+  });
+
+  app.put("/api/admin/domain-instructions", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const parsed = domainInstructionsSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data" });
+      }
+      let instructions = await DomainInstructions.findOne();
+      if (instructions) {
+        instructions = await DomainInstructions.findByIdAndUpdate(instructions._id, parsed.data, { new: true });
+      } else {
+        instructions = await DomainInstructions.create(parsed.data);
+      }
+      await Log.create({ action: "Domain instructions updated", level: "info" });
+      res.json(instructions);
+    } catch (error) {
+      console.error("Update domain instructions error:", error);
+      res.status(500).json({ message: "Failed to update instructions" });
+    }
+  });
+
+  // Storage Settings Routes
+  app.get("/api/admin/storage-settings", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      let settings = await StorageSettings.findOne();
+      if (!settings) {
+        settings = await StorageSettings.create({});
+      }
+      const emailCount = await Mailbox.countDocuments();
+      const messageCount = await Message.countDocuments();
+      res.json({ ...settings.toObject(), currentEmailCount: emailCount, currentMessageCount: messageCount });
+    } catch (error) {
+      console.error("Get storage settings error:", error);
+      res.json({ autoDeleteEnabled: true, autoDeleteDays: 7, maxStorageEmails: 10000, maxStorageMessages: 50000 });
+    }
+  });
+
+  app.put("/api/admin/storage-settings", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const parsed = storageSettingsSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid settings" });
+      }
+      let settings = await StorageSettings.findOne();
+      if (settings) {
+        settings = await StorageSettings.findByIdAndUpdate(settings._id, parsed.data, { new: true });
+      } else {
+        settings = await StorageSettings.create(parsed.data);
+      }
+      await Log.create({ action: "Storage settings updated", level: "info" });
+      res.json(settings);
+    } catch (error) {
+      console.error("Update storage settings error:", error);
+      res.status(500).json({ message: "Failed to update settings" });
+    }
+  });
+
+  app.post("/api/admin/storage/cleanup", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const deletedMessages = await Message.deleteMany({});
+      const deletedMailboxes = await Mailbox.deleteMany({});
+      await Log.create({ 
+        action: "Manual storage cleanup", 
+        details: `Deleted ${deletedMailboxes.deletedCount} mailboxes and ${deletedMessages.deletedCount} messages`,
+        level: "warning" 
+      });
+      res.json({ 
+        message: "Cleanup completed",
+        deletedMailboxes: deletedMailboxes.deletedCount,
+        deletedMessages: deletedMessages.deletedCount
+      });
+    } catch (error) {
+      console.error("Storage cleanup error:", error);
+      res.status(500).json({ message: "Failed to cleanup storage" });
+    }
+  });
+
+  // Domain Limits Routes
+  app.get("/api/domain-limits", async (req, res) => {
+    try {
+      let limits = await DomainLimits.findOne();
+      if (!limits) {
+        limits = await DomainLimits.create({});
+      }
+      res.json(limits);
+    } catch (error) {
+      console.error("Get domain limits error:", error);
+      res.json({ maxFreeCustomDomains: 1, limitMessage: "Please purchase a plan to add more custom domains." });
+    }
+  });
+
+  app.get("/api/admin/domain-limits", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      let limits = await DomainLimits.findOne();
+      if (!limits) {
+        limits = await DomainLimits.create({});
+      }
+      res.json(limits);
+    } catch (error) {
+      console.error("Get domain limits error:", error);
+      res.json({ maxFreeCustomDomains: 1, limitMessage: "Please purchase a plan to add more custom domains." });
+    }
+  });
+
+  app.put("/api/admin/domain-limits", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const parsed = domainLimitsSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid settings" });
+      }
+      let limits = await DomainLimits.findOne();
+      if (limits) {
+        limits = await DomainLimits.findByIdAndUpdate(limits._id, parsed.data, { new: true });
+      } else {
+        limits = await DomainLimits.create(parsed.data);
+      }
+      await Log.create({ action: "Domain limits updated", level: "info" });
+      res.json(limits);
+    } catch (error) {
+      console.error("Update domain limits error:", error);
+      res.status(500).json({ message: "Failed to update limits" });
+    }
+  });
+
+  // User CRUD Routes (Admin)
+  app.get("/api/admin/users", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const users = await User.find().select("-password").sort({ createdAt: -1 });
+      res.json(users);
+    } catch (error) {
+      console.error("Get users error:", error);
+      res.json([]);
+    }
+  });
+
+  app.put("/api/admin/users/:id", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const { username, email, role, isVerified } = req.body;
+      const user = await User.findByIdAndUpdate(
+        req.params.id,
+        { username, email, role, isVerified },
+        { new: true }
+      ).select("-password");
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      await Log.create({ action: "User updated", details: `User ${user.username} updated`, level: "info" });
+      res.json(user);
+    } catch (error) {
+      console.error("Update user error:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/admin/users/:id", authMiddleware as any, adminMiddleware as any, async (req: AuthRequest, res) => {
+    try {
+      const user = await User.findById(req.params.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      if (user._id.toString() === req.user!._id) {
+        return res.status(400).json({ message: "Cannot delete yourself" });
+      }
+      await User.findByIdAndDelete(req.params.id);
+      await Log.create({ action: "User deleted", details: `User ${user.username} deleted`, level: "warning" });
+      res.json({ message: "User deleted" });
+    } catch (error) {
+      console.error("Delete user error:", error);
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  app.post("/api/admin/users/:id/login-as", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const user = await User.findById(req.params.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const token = generateToken(user._id.toString());
+      await Log.create({ action: "Admin logged in as user", details: `Logged in as ${user.username}`, level: "warning" });
+      res.json({
+        user: {
+          _id: user._id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          isVerified: user.isVerified,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        },
+        token,
+      });
+    } catch (error) {
+      console.error("Login as user error:", error);
+      res.status(500).json({ message: "Failed to login as user" });
+    }
+  });
+
+  // Check domain limit for user before adding
+  app.get("/api/user/domain-count", authMiddleware as any, async (req: AuthRequest, res) => {
+    try {
+      const count = await Domain.countDocuments({ userId: req.user!._id, type: "custom" });
+      const limits = await DomainLimits.findOne();
+      const maxAllowed = limits?.maxFreeCustomDomains || 1;
+      const limitMessage = limits?.limitMessage || "Please purchase a plan to add more custom domains.";
+      res.json({ count, maxAllowed, canAddMore: count < maxAllowed, limitMessage });
+    } catch (error) {
+      console.error("Get domain count error:", error);
+      res.json({ count: 0, maxAllowed: 1, canAddMore: true, limitMessage: "" });
     }
   });
 

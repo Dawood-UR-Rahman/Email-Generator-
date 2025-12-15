@@ -1,0 +1,80 @@
+App Update – Required Changes
+
+Please implement the following updates in the application:
+
+1. Custom Domain Visibility
+
+A custom domain should be visible only to the user who added it.
+
+Other logged-in users must not be able to see or use another user’s custom domain.
+
+2. Custom Domain Instructions
+
+In the Admin Panel, add the ability to add and update domain connection instructions (e.g., How to Connect Your Domain).
+
+Ensure that any updates made by the admin are automatically reflected in the user panel.
+
+3. Database Storage Management (Admin Panel)
+
+Add a new tab in the admin panel called “Manage Database Storage.”
+
+From this tab, the admin should be able to:
+
+Configure automatic deletion of temporary emails and messages after a specified time period.
+
+Set a data limit to automatically clean temporary mail and message records for better database performance.
+
+Manually delete all temporary emails and messages using a single action button (Create / Delete buttons for maintenance tasks).
+
+4. User Management (Admin Panel)
+
+In the Users section of the admin panel:
+
+Display a list of all users.
+
+Provide options to:
+
+Log in as a user
+
+Edit user details
+
+Delete users
+
+Enable full CRUD operations for user management.
+
+5. Contact Submissions & Email Branding
+
+Display all contact form submissions properly in the Contact section of the admin panel.
+
+When the system sends emails via SMTP:
+
+Show the website name (set by the admin) in the email header instead of generic “Admin” text.
+
+6. Logo Management Across the System
+
+In the User Panel (Frontend):
+
+Display the logo set by the admin instead of the default logo.
+
+In the Admin Panel:
+
+Display the admin-uploaded logo instead of the default logo.
+
+If no logo is set by the admin:
+
+Use a new system default logo.
+
+7. Custom Domain Limits & Plans
+
+Add a new admin panel tab called “Manage Custom Domains.”
+
+Allow the admin to:
+
+Set the maximum number of custom domains allowed for free users.
+
+If a user reaches the limit:
+
+Prevent adding more custom domains.
+
+Display a message such as:
+“Please purchase a plan to add more custom domains and create permanent email addresses.”

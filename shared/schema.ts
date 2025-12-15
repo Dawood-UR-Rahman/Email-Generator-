@@ -418,6 +418,53 @@ export const newsletterSubscriberSchema = z.object({
 
 export type InsertNewsletterSubscriber = z.infer<typeof newsletterSubscriberSchema>;
 
+// Domain Instructions Schema (Admin configurable)
+export interface DomainInstructions {
+  _id: string;
+  content: string;
+  updatedAt: Date;
+}
+
+export const domainInstructionsSchema = z.object({
+  content: z.string().min(1, "Instructions content is required"),
+});
+
+export type InsertDomainInstructions = z.infer<typeof domainInstructionsSchema>;
+
+// Storage Settings Schema (Database cleanup settings)
+export interface StorageSettings {
+  _id: string;
+  autoDeleteEnabled: boolean;
+  autoDeleteDays: number;
+  maxStorageEmails: number;
+  maxStorageMessages: number;
+  updatedAt: Date;
+}
+
+export const storageSettingsSchema = z.object({
+  autoDeleteEnabled: z.boolean().default(true),
+  autoDeleteDays: z.number().min(1).max(365).default(7),
+  maxStorageEmails: z.number().min(100).max(1000000).default(10000),
+  maxStorageMessages: z.number().min(100).max(1000000).default(50000),
+});
+
+export type InsertStorageSettings = z.infer<typeof storageSettingsSchema>;
+
+// Domain Limits Schema (Custom domain limits for free users)
+export interface DomainLimits {
+  _id: string;
+  maxFreeCustomDomains: number;
+  limitMessage: string;
+  updatedAt: Date;
+}
+
+export const domainLimitsSchema = z.object({
+  maxFreeCustomDomains: z.number().min(0).max(100).default(1),
+  limitMessage: z.string().default("Please purchase a plan to add more custom domains and create permanent email addresses."),
+});
+
+export type InsertDomainLimits = z.infer<typeof domainLimitsSchema>;
+
 // API Response types
 export interface AuthResponse {
   user: Omit<User, "password">;

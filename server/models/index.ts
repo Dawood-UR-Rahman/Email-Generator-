@@ -174,6 +174,43 @@ const NewsletterSubscriberSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
+const DomainInstructionsSchema = new mongoose.Schema({
+  content: { type: String, required: true, default: `<ol class="space-y-3 text-sm text-muted-foreground">
+    <li class="flex items-start gap-2">
+      <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">1</span>
+      <span>Add your domain using the form above</span>
+    </li>
+    <li class="flex items-start gap-2">
+      <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">2</span>
+      <span>Copy the TXT verification record provided</span>
+    </li>
+    <li class="flex items-start gap-2">
+      <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">3</span>
+      <span>Add the TXT record to your domain's DNS settings</span>
+    </li>
+    <li class="flex items-start gap-2">
+      <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">4</span>
+      <span>Add an MX record pointing to our mail server</span>
+    </li>
+    <li class="flex items-start gap-2">
+      <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">5</span>
+      <span>Wait for verification (usually within 24 hours)</span>
+    </li>
+  </ol>` },
+}, { timestamps: true });
+
+const StorageSettingsSchema = new mongoose.Schema({
+  autoDeleteEnabled: { type: Boolean, default: true },
+  autoDeleteDays: { type: Number, default: 7 },
+  maxStorageEmails: { type: Number, default: 10000 },
+  maxStorageMessages: { type: Number, default: 50000 },
+}, { timestamps: true });
+
+const DomainLimitsSchema = new mongoose.Schema({
+  maxFreeCustomDomains: { type: Number, default: 1 },
+  limitMessage: { type: String, default: "Please purchase a plan to add more custom domains and create permanent email addresses." },
+}, { timestamps: true });
+
 export const User = mongoose.model("User", UserSchema);
 export const Domain = mongoose.model("Domain", DomainSchema);
 export const Mailbox = mongoose.model("Mailbox", MailboxSchema);
@@ -191,3 +228,6 @@ export const ContactSubmission = mongoose.model("ContactSubmission", ContactSubm
 export const HomepageContent = mongoose.model("HomepageContent", HomepageContentSchema);
 export const EmailTemplate = mongoose.model("EmailTemplate", EmailTemplateSchema);
 export const NewsletterSubscriber = mongoose.model("NewsletterSubscriber", NewsletterSubscriberSchema);
+export const DomainInstructions = mongoose.model("DomainInstructions", DomainInstructionsSchema);
+export const StorageSettings = mongoose.model("StorageSettings", StorageSettingsSchema);
+export const DomainLimits = mongoose.model("DomainLimits", DomainLimitsSchema);
