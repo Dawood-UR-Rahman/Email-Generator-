@@ -1,7 +1,12 @@
 import { Link } from "wouter";
-import { Mail, Twitter, Github, Linkedin } from "lucide-react";
+import { Mail, Twitter, Github, Linkedin, Facebook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import type { SiteSettings } from "@shared/schema";
 
 const quickLinks = [
   { label: "Home", href: "/" },
@@ -17,31 +22,111 @@ const resourceLinks = [
 ];
 
 export function Footer() {
+  const { toast } = useToast();
+  const [email, setEmail] = useState("");
+
+  const { data: siteSettings } = useQuery<SiteSettings>({
+    queryKey: ["/api/site-settings"],
+  });
+
+  const subscribeMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const response = await apiRequest("POST", "/api/newsletter/subscribe", { email });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Subscription failed");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Subscribed!",
+        description: "Please check your email to confirm your subscription.",
+      });
+      setEmail("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Subscription failed",
+        description: error.message || "Please try again later.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (email.trim()) {
+      subscribeMutation.mutate(email.trim());
+    }
+  };
+
+  const siteName = siteSettings?.siteName || "TempMail";
+  const footerLogo = siteSettings?.footerLogo || siteSettings?.siteLogo;
+  const footerText = siteSettings?.footerText || "Free temporary email addresses for protecting your privacy online. No registration required.";
+  const copyrightText = siteSettings?.copyrightText || `${new Date().getFullYear()} ${siteName}. All rights reserved.`;
+  const socialLinks = siteSettings?.socialLinks || {};
+
   return (
     <footer className="bg-foreground text-background py-12 md:py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           <div>
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-                <Mail className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <span className="font-bold text-xl">TempMail</span>
+              {footerLogo ? (
+                <img src={footerLogo} alt={siteName} className="h-10 w-auto object-contain" />
+              ) : (
+                <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
+                  <Mail className="h-5 w-5 text-primary-foreground" />
+                </div>
+              )}
+              <span className="font-bold text-xl">{siteName}</span>
             </Link>
             <p className="text-sm text-background/70 mb-4">
-              Free temporary email addresses for protecting your privacy online. 
-              No registration required.
+              {footerText}
             </p>
             <div className="flex gap-2">
-              <Button size="icon" variant="ghost" className="hover:bg-background/10">
-                <Twitter className="h-4 w-4" />
-              </Button>
-              <Button size="icon" variant="ghost" className="hover:bg-background/10">
-                <Github className="h-4 w-4" />
-              </Button>
-              <Button size="icon" variant="ghost" className="hover:bg-background/10">
-                <Linkedin className="h-4 w-4" />
-              </Button>
+              {socialLinks.twitter && (
+                <a href={socialLinks.twitter} target="_blank" rel="noopener noreferrer">
+                  <Button size="icon" variant="ghost" className="text-background hover:bg-background/10">
+                    <Twitter className="h-4 w-4" />
+                  </Button>
+                </a>
+              )}
+              {socialLinks.github && (
+                <a href={socialLinks.github} target="_blank" rel="noopener noreferrer">
+                  <Button size="icon" variant="ghost" className="text-background hover:bg-background/10">
+                    <Github className="h-4 w-4" />
+                  </Button>
+                </a>
+              )}
+              {socialLinks.linkedin && (
+                <a href={socialLinks.linkedin} target="_blank" rel="noopener noreferrer">
+                  <Button size="icon" variant="ghost" className="text-background hover:bg-background/10">
+                    <Linkedin className="h-4 w-4" />
+                  </Button>
+                </a>
+              )}
+              {socialLinks.facebook && (
+                <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer">
+                  <Button size="icon" variant="ghost" className="text-background hover:bg-background/10">
+                    <Facebook className="h-4 w-4" />
+                  </Button>
+                </a>
+              )}
+              {!socialLinks.twitter && !socialLinks.github && !socialLinks.linkedin && !socialLinks.facebook && (
+                <>
+                  <Button size="icon" variant="ghost" className="text-background hover:bg-background/10">
+                    <Twitter className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="text-background hover:bg-background/10">
+                    <Github className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="text-background hover:bg-background/10">
+                    <Linkedin className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
@@ -82,22 +167,30 @@ export function Footer() {
             <p className="text-sm text-background/70 mb-4">
               Subscribe to get updates on privacy tips and new features.
             </p>
-            <div className="flex gap-2">
+            <form onSubmit={handleSubscribe} className="flex gap-2">
               <Input 
-                placeholder="Enter your email" 
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="bg-background/10 border-background/20 text-background placeholder:text-background/50"
                 data-testid="input-newsletter-email"
+                required
               />
-              <Button data-testid="button-subscribe">
-                Subscribe
+              <Button 
+                type="submit" 
+                disabled={subscribeMutation.isPending}
+                data-testid="button-subscribe"
+              >
+                {subscribeMutation.isPending ? "..." : "Subscribe"}
               </Button>
-            </div>
+            </form>
           </div>
         </div>
 
         <div className="border-t border-background/20 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-background/70">
-            {new Date().getFullYear()} TempMail. All rights reserved.
+            {copyrightText}
           </p>
           <div className="flex items-center gap-4 text-sm text-background/70">
             <Link href="/privacy" className="hover:text-background transition-colors">
