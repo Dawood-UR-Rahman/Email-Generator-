@@ -120,8 +120,19 @@ const AppSettingsSchema = new mongoose.Schema({
 const SiteSettingsSchema = new mongoose.Schema({
   siteName: { type: String, default: "TempMail" },
   siteLogo: { type: String, default: "" },
+  headerLogo: { type: String, default: "" },
+  footerLogo: { type: String, default: "" },
   defaultMetaTitle: { type: String, default: "TempMail - Free Temporary Email Service" },
   defaultMetaDescription: { type: String, default: "Create disposable email addresses instantly. Protect your privacy with our free temporary email service." },
+  footerText: { type: String, default: "Free temporary email addresses for protecting your privacy online. No registration required." },
+  copyrightText: { type: String, default: "All rights reserved." },
+  socialLinks: {
+    twitter: { type: String, default: "" },
+    github: { type: String, default: "" },
+    linkedin: { type: String, default: "" },
+    facebook: { type: String, default: "" },
+  },
+  contactEmail: { type: String, default: "" },
 }, { timestamps: true });
 
 const ContactSubmissionSchema = new mongoose.Schema({
@@ -150,6 +161,19 @@ const HomepageContentSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
+const EmailTemplateSchema = new mongoose.Schema({
+  type: { type: String, enum: ["welcome", "forgot_password", "contact_notification", "newsletter_confirmation"], required: true },
+  name: { type: String, required: true },
+  subject: { type: String, required: true },
+  htmlContent: { type: String, required: true },
+  isActive: { type: Boolean, default: true },
+}, { timestamps: true });
+
+const NewsletterSubscriberSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  isActive: { type: Boolean, default: true },
+}, { timestamps: true });
+
 export const User = mongoose.model("User", UserSchema);
 export const Domain = mongoose.model("Domain", DomainSchema);
 export const Mailbox = mongoose.model("Mailbox", MailboxSchema);
@@ -165,3 +189,5 @@ export const AppSettings = mongoose.model("AppSettings", AppSettingsSchema);
 export const SiteSettings = mongoose.model("SiteSettings", SiteSettingsSchema);
 export const ContactSubmission = mongoose.model("ContactSubmission", ContactSubmissionSchema);
 export const HomepageContent = mongoose.model("HomepageContent", HomepageContentSchema);
+export const EmailTemplate = mongoose.model("EmailTemplate", EmailTemplateSchema);
+export const NewsletterSubscriber = mongoose.model("NewsletterSubscriber", NewsletterSubscriberSchema);

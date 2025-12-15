@@ -4,7 +4,8 @@ import {
   Mail, Settings, Users, Globe, Inbox, FileText, 
   Save, TestTube, Check, X, Send, Trash2, RefreshCw,
   LogOut, AlertCircle, CheckCircle, Eye, EyeOff,
-  Plus, Star, Edit, BookOpen, Layout, Megaphone, MessageSquare, Home
+  Plus, Star, Edit, BookOpen, Layout, Megaphone, MessageSquare, Home,
+  Download, MailCheck
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -60,12 +61,12 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { 
   imapSettingsSchema, smtpSettingsSchema, insertDomainSchema, 
   insertBlogPostSchema, insertPageContentSchema, insertAdSnippetSchema, appSettingsSchema,
-  siteSettingsSchema, homepageContentSchema,
+  siteSettingsSchema, homepageContentSchema, emailTemplateSchema,
   type InsertImapSettings, type InsertSmtpSettings, type InsertDomain,
   type InsertBlogPost, type InsertPageContent, type InsertAdSnippet, type InsertAppSettings,
-  type InsertSiteSettings, type InsertHomepageContent,
+  type InsertSiteSettings, type InsertHomepageContent, type InsertEmailTemplate,
   type User, type Domain, type Log, type BlogPost, type PageContent, type AdSnippet, type AppSettings,
-  type SiteSettings, type ContactSubmission, type HomepageContent, type FAQItem
+  type SiteSettings, type ContactSubmission, type HomepageContent, type FAQItem, type EmailTemplate
 } from "@shared/schema";
 
 export default function Admin() {
@@ -84,6 +85,7 @@ export default function Admin() {
   const [contacts, setContacts] = useState<ContactSubmission[]>([]);
   const [homepageContent, setHomepageContent] = useState<HomepageContent | null>(null);
   const [faqItems, setFaqItems] = useState<FAQItem[]>([]);
+  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
   
   const [showImapPassword, setShowImapPassword] = useState(false);
   const [showSmtpPassword, setShowSmtpPassword] = useState(false);
@@ -100,6 +102,8 @@ export default function Admin() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [editingPage, setEditingPage] = useState<PageContent | null>(null);
   const [editingAd, setEditingAd] = useState<AdSnippet | null>(null);
+  const [showEmailTemplateDialog, setShowEmailTemplateDialog] = useState(false);
+  const [editingEmailTemplate, setEditingEmailTemplate] = useState<EmailTemplate | null>(null);
 
   const imapForm = useForm<InsertImapSettings>({
     resolver: zodResolver(imapSettingsSchema),
@@ -164,6 +168,17 @@ export default function Admin() {
     },
   });
 
+  const emailTemplateForm = useForm<InsertEmailTemplate>({
+    resolver: zodResolver(emailTemplateSchema),
+    defaultValues: {
+      type: "welcome",
+      name: "",
+      subject: "",
+      htmlContent: "",
+      isActive: true,
+    },
+  });
+
   const settingsForm = useForm<InsertAppSettings>({
     resolver: zodResolver(appSettingsSchema),
     defaultValues: {
@@ -178,8 +193,14 @@ export default function Admin() {
     defaultValues: {
       siteName: "TempMail",
       siteLogo: "",
+      headerLogo: "",
+      footerLogo: "",
       defaultMetaTitle: "TempMail - Free Temporary Email Service",
       defaultMetaDescription: "Create disposable email addresses instantly. Protect your privacy with our free temporary email service.",
+      footerText: "",
+      copyrightText: "",
+      socialLinks: { twitter: "", github: "", linkedin: "", facebook: "" },
+      contactEmail: "",
     },
   });
 
@@ -214,7 +235,7 @@ export default function Admin() {
     const headers = { "Authorization": `Bearer ${token}` };
     
     try {
-      const [domainsRes, blogRes, pagesRes, adsRes, settingsRes, siteSettingsRes, contactsRes, homepageRes] = await Promise.all([
+      const [domainsRes, blogRes, pagesRes, adsRes, settingsRes, siteSettingsRes, contactsRes, homepageRes, emailTemplatesRes] = await Promise.all([
         fetch("/api/admin/domains", { headers }),
         fetch("/api/admin/blog", { headers }),
         fetch("/api/admin/pages", { headers }),
@@ -223,6 +244,7 @@ export default function Admin() {
         fetch("/api/admin/site-settings", { headers }),
         fetch("/api/admin/contacts", { headers }),
         fetch("/api/admin/homepage-content", { headers }),
+        fetch("/api/admin/email-templates", { headers }),
       ]);
       
       if (domainsRes.ok) {
@@ -256,8 +278,14 @@ export default function Admin() {
         siteSettingsForm.reset({
           siteName: data.siteName || "TempMail",
           siteLogo: data.siteLogo || "",
+          headerLogo: data.headerLogo || "",
+          footerLogo: data.footerLogo || "",
           defaultMetaTitle: data.defaultMetaTitle || "TempMail - Free Temporary Email Service",
           defaultMetaDescription: data.defaultMetaDescription || "Create disposable email addresses instantly. Protect your privacy with our free temporary email service.",
+          footerText: data.footerText || "",
+          copyrightText: data.copyrightText || "",
+          socialLinks: data.socialLinks || { twitter: "", github: "", linkedin: "", facebook: "" },
+          contactEmail: data.contactEmail || "",
         });
       }
       if (contactsRes.ok) {
@@ -283,6 +311,10 @@ export default function Admin() {
           faqItems: data.faqItems || [],
         });
       }
+      if (emailTemplatesRes.ok) {
+        const data = await emailTemplatesRes.json();
+        setEmailTemplates(data);
+      }
     } catch (error) {
       console.error("Failed to fetch data:", error);
     }
@@ -299,6 +331,64 @@ export default function Admin() {
     } catch {
       toast({ title: "Failed to delete contact", variant: "destructive" });
     }
+  };
+
+  const handleExportContacts = () => {
+    window.open("/api/admin/contacts/export", "_blank");
+  };
+
+  const handleSaveEmailTemplate = async (data: InsertEmailTemplate) => {
+    try {
+      const url = editingEmailTemplate 
+        ? `/api/admin/email-templates/${editingEmailTemplate._id}` 
+        : "/api/admin/email-templates";
+      const method = editingEmailTemplate ? "PUT" : "POST";
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to save email template");
+      toast({ title: editingEmailTemplate ? "Email template updated" : "Email template created" });
+      setShowEmailTemplateDialog(false);
+      setEditingEmailTemplate(null);
+      emailTemplateForm.reset();
+      fetchData();
+    } catch (error) {
+      toast({ 
+        title: "Failed to save email template",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const handleDeleteEmailTemplate = async (templateId: string) => {
+    try {
+      await fetch(`/api/admin/email-templates/${templateId}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
+      });
+      setEmailTemplates(emailTemplates.filter(t => t._id !== templateId));
+      toast({ title: "Email template deleted" });
+    } catch {
+      toast({ title: "Failed to delete email template", variant: "destructive" });
+    }
+  };
+
+  const openEditEmailTemplate = (template: EmailTemplate) => {
+    setEditingEmailTemplate(template);
+    emailTemplateForm.reset({
+      type: template.type,
+      name: template.name,
+      subject: template.subject,
+      htmlContent: template.htmlContent,
+      isActive: template.isActive,
+    });
+    setShowEmailTemplateDialog(true);
   };
 
   const handleSaveHomepageContent = async (data: InsertHomepageContent) => {
@@ -844,6 +934,10 @@ export default function Admin() {
             <TabsTrigger value="homepage" data-testid="admin-tab-homepage">
               <Home className="h-4 w-4 mr-2 hidden sm:inline" />
               Homepage
+            </TabsTrigger>
+            <TabsTrigger value="emails" data-testid="admin-tab-emails">
+              <MailCheck className="h-4 w-4 mr-2 hidden sm:inline" />
+              Email Templates
             </TabsTrigger>
             <TabsTrigger value="logs" data-testid="admin-tab-logs">
               <FileText className="h-4 w-4 mr-2 hidden sm:inline" />
@@ -1950,43 +2044,107 @@ export default function Admin() {
             <Card className="p-6">
               <Form {...siteSettingsForm}>
                 <form onSubmit={siteSettingsForm.handleSubmit(handleSaveSiteSettings)} className="space-y-6">
-                  <div className="grid gap-6 md:grid-cols-2">
-                    <FormField
-                      control={siteSettingsForm.control}
-                      name="siteName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Site Name</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="TempMail" 
-                              data-testid="input-site-name"
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormDescription>The name of your website</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={siteSettingsForm.control}
-                      name="siteLogo"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Site Logo URL</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="https://example.com/logo.png" 
-                              data-testid="input-site-logo"
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormDescription>URL of your site logo image</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-sm text-muted-foreground">General Settings</h4>
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <FormField
+                        control={siteSettingsForm.control}
+                        name="siteName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Site Name</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="TempMail" 
+                                data-testid="input-site-name"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormDescription>The name of your website</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={siteSettingsForm.control}
+                        name="contactEmail"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Contact Email</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="email"
+                                placeholder="contact@example.com" 
+                                data-testid="input-contact-email"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormDescription>Email for contact form notifications</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-sm text-muted-foreground">Logo Settings</h4>
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <FormField
+                        control={siteSettingsForm.control}
+                        name="siteLogo"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Site Logo URL</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="https://example.com/logo.png" 
+                                data-testid="input-site-logo"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormDescription>Main site logo image</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={siteSettingsForm.control}
+                        name="headerLogo"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Header Logo URL</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="https://example.com/header-logo.png" 
+                                data-testid="input-header-logo"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormDescription>Logo displayed in the header</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={siteSettingsForm.control}
+                        name="footerLogo"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Footer Logo URL</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="https://example.com/footer-logo.png" 
+                                data-testid="input-footer-logo"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormDescription>Logo displayed in the footer</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </div>
                   
                   <div className="space-y-4">
@@ -2030,6 +2188,121 @@ export default function Admin() {
                     />
                   </div>
 
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-sm text-muted-foreground">Footer Settings</h4>
+                    <FormField
+                      control={siteSettingsForm.control}
+                      name="footerText"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Footer Text</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Free temporary email addresses for protecting your privacy online." 
+                              className="min-h-[60px]"
+                              data-testid="input-footer-text"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>Description text shown in the footer</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={siteSettingsForm.control}
+                      name="copyrightText"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Copyright Text</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="All rights reserved." 
+                              data-testid="input-copyright-text"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>Copyright notice in the footer</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-sm text-muted-foreground">Social Links</h4>
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <FormField
+                        control={siteSettingsForm.control}
+                        name="socialLinks.twitter"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Twitter URL</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="https://twitter.com/yourhandle" 
+                                data-testid="input-social-twitter"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={siteSettingsForm.control}
+                        name="socialLinks.github"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>GitHub URL</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="https://github.com/yourrepo" 
+                                data-testid="input-social-github"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={siteSettingsForm.control}
+                        name="socialLinks.linkedin"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>LinkedIn URL</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="https://linkedin.com/company/yourcompany" 
+                                data-testid="input-social-linkedin"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={siteSettingsForm.control}
+                        name="socialLinks.facebook"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Facebook URL</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="https://facebook.com/yourpage" 
+                                data-testid="input-social-facebook"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
                   <Button type="submit" data-testid="button-save-site-settings">
                     <Save className="h-4 w-4 mr-2" />
                     Save Site Settings
@@ -2047,6 +2320,10 @@ export default function Admin() {
                   View and manage contact form submissions
                 </p>
               </div>
+              <Button onClick={handleExportContacts} variant="outline" data-testid="button-export-contacts">
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
             </div>
 
             <Card className="overflow-hidden">
@@ -2302,6 +2579,196 @@ export default function Admin() {
                 </Button>
               </form>
             </Form>
+          </TabsContent>
+
+          <TabsContent value="emails" className="space-y-6">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <h2 className="text-xl font-semibold">Email Templates</h2>
+                <p className="text-sm text-muted-foreground">
+                  Manage email templates for notifications and transactional emails
+                </p>
+              </div>
+              <Dialog open={showEmailTemplateDialog} onOpenChange={(open) => {
+                setShowEmailTemplateDialog(open);
+                if (!open) {
+                  setEditingEmailTemplate(null);
+                  emailTemplateForm.reset();
+                }
+              }}>
+                <DialogTrigger asChild>
+                  <Button data-testid="button-add-email-template">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Template
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>{editingEmailTemplate ? "Edit Email Template" : "Create Email Template"}</DialogTitle>
+                  </DialogHeader>
+                  <Form {...emailTemplateForm}>
+                    <form onSubmit={emailTemplateForm.handleSubmit(handleSaveEmailTemplate)} className="space-y-4">
+                      <FormField
+                        control={emailTemplateForm.control}
+                        name="type"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Template Type</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-template-type">
+                                  <SelectValue placeholder="Select template type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="welcome">Welcome Email</SelectItem>
+                                <SelectItem value="forgot_password">Forgot Password</SelectItem>
+                                <SelectItem value="contact_notification">Contact Notification</SelectItem>
+                                <SelectItem value="newsletter_confirmation">Newsletter Confirmation</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={emailTemplateForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Template Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Welcome Email Template" data-testid="input-template-name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={emailTemplateForm.control}
+                        name="subject"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email Subject</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Welcome to {{siteName}}" data-testid="input-template-subject" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={emailTemplateForm.control}
+                        name="htmlContent"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>HTML Content</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Enter HTML content with variables like {{username}}, {{email}}..." 
+                                className="min-h-[200px] font-mono text-sm"
+                                data-testid="input-template-content" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Available variables: {"{{username}}"}, {"{{email}}"}, {"{{message}}"}, {"{{subject}}"}, {"{{siteName}}"}, {"{{siteLogo}}"}, {"{{siteUrl}}"}, {"{{unsubscribeUrl}}"}, {"{{resetLink}}"}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={emailTemplateForm.control}
+                        name="isActive"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">Active</FormLabel>
+                              <FormDescription>Enable this template for use</FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="switch-template-active"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button type="button" variant="outline">Cancel</Button>
+                        </DialogClose>
+                        <Button type="submit" data-testid="button-save-template">
+                          <Save className="h-4 w-4 mr-2" />
+                          {editingEmailTemplate ? "Update Template" : "Create Template"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <Card className="overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {emailTemplates.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                        No email templates yet. Click "Add Template" to create one.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    emailTemplates.map((template) => (
+                      <TableRow key={template._id} data-testid={`row-template-${template._id}`}>
+                        <TableCell>
+                          <Badge variant="outline">{template.type.replace(/_/g, " ")}</Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{template.name}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{template.subject}</TableCell>
+                        <TableCell>
+                          <Badge variant={template.isActive ? "default" : "secondary"}>
+                            {template.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button 
+                              size="icon" 
+                              variant="ghost"
+                              onClick={() => openEditEmailTemplate(template)}
+                              data-testid={`button-edit-template-${template._id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="icon" 
+                              variant="ghost"
+                              onClick={() => handleDeleteEmailTemplate(template._id)}
+                              data-testid={`button-delete-template-${template._id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
           </TabsContent>
 
           <TabsContent value="logs" className="space-y-6">

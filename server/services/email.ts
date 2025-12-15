@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer";
-import { SmtpSettings } from "../models/index";
+import { SmtpSettings, SiteSettings, EmailTemplate } from "../models/index";
 
 let transporter: nodemailer.Transporter | null = null;
 
@@ -181,5 +181,149 @@ export async function sendWelcomeEmail(email: string, username: string, siteName
         </p>
       </div>
     `,
+  });
+}
+
+// Template variable substitution
+interface TemplateVariables {
+  username?: string;
+  email?: string;
+  message?: string;
+  subject?: string;
+  siteName?: string;
+  siteLogo?: string;
+  siteUrl?: string;
+  unsubscribeUrl?: string;
+  [key: string]: string | undefined;
+}
+
+export function substituteTemplateVariables(template: string, variables: TemplateVariables): string {
+  let result = template;
+  for (const [key, value] of Object.entries(variables)) {
+    const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'gi');
+    result = result.replace(regex, value || '');
+  }
+  return result;
+}
+
+async function getSiteInfo(): Promise<{ siteName: string; siteLogo: string; siteUrl: string; contactEmail: string }> {
+  const settings = await SiteSettings.findOne();
+  return {
+    siteName: settings?.siteName || "TempMail",
+    siteLogo: settings?.siteLogo || "",
+    siteUrl: process.env.APP_URL || "http://localhost:5000",
+    contactEmail: settings?.contactEmail || "",
+  };
+}
+
+export async function sendContactNotification(contact: {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+}): Promise<boolean> {
+  const siteInfo = await getSiteInfo();
+  
+  if (!siteInfo.contactEmail) {
+    console.log("No contact email configured in site settings");
+    return false;
+  }
+
+  // Try to use custom template first
+  const template = await EmailTemplate.findOne({ type: "contact_notification", isActive: true });
+  
+  let html: string;
+  let subject: string;
+  
+  if (template) {
+    const variables: TemplateVariables = {
+      username: contact.name,
+      email: contact.email,
+      subject: contact.subject,
+      message: contact.message,
+      siteName: siteInfo.siteName,
+      siteLogo: siteInfo.siteLogo,
+      siteUrl: siteInfo.siteUrl,
+    };
+    html = substituteTemplateVariables(template.htmlContent, variables);
+    subject = substituteTemplateVariables(template.subject, variables);
+  } else {
+    // Default template
+    subject = `New Contact Form Submission: ${contact.subject}`;
+    html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #f97316;">New Contact Form Submission</h1>
+        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p><strong>Name:</strong> ${contact.name}</p>
+          <p><strong>Email:</strong> ${contact.email}</p>
+          <p><strong>Subject:</strong> ${contact.subject}</p>
+        </div>
+        <div style="background: #fff; border: 1px solid #eee; padding: 20px; border-radius: 8px;">
+          <h3>Message:</h3>
+          <p style="white-space: pre-wrap;">${contact.message}</p>
+        </div>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+        <p style="color: #666; font-size: 12px;">
+          This message was sent from the contact form on ${siteInfo.siteName}
+        </p>
+      </div>
+    `;
+  }
+
+  return sendEmail({
+    to: siteInfo.contactEmail,
+    subject,
+    html,
+  });
+}
+
+export async function sendNewsletterConfirmation(email: string): Promise<boolean> {
+  const siteInfo = await getSiteInfo();
+  const unsubscribeUrl = `${siteInfo.siteUrl}/api/newsletter/unsubscribe?email=${encodeURIComponent(email)}`;
+
+  // Try to use custom template first
+  const template = await EmailTemplate.findOne({ type: "newsletter_confirmation", isActive: true });
+  
+  let html: string;
+  let subject: string;
+  
+  if (template) {
+    const variables: TemplateVariables = {
+      email,
+      siteName: siteInfo.siteName,
+      siteLogo: siteInfo.siteLogo,
+      siteUrl: siteInfo.siteUrl,
+      unsubscribeUrl,
+    };
+    html = substituteTemplateVariables(template.htmlContent, variables);
+    subject = substituteTemplateVariables(template.subject, variables);
+  } else {
+    // Default template
+    const logoHtml = siteInfo.siteLogo 
+      ? `<img src="${siteInfo.siteLogo}" alt="${siteInfo.siteName}" style="max-width: 150px; margin-bottom: 20px;">` 
+      : "";
+      
+    subject = `Welcome to ${siteInfo.siteName} Newsletter!`;
+    html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; text-align: center;">
+        ${logoHtml}
+        <h1 style="color: #f97316;">Thanks for Subscribing!</h1>
+        <p>You've successfully subscribed to the ${siteInfo.siteName} newsletter.</p>
+        <p>You'll receive updates about new features, tips, and more straight to your inbox.</p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+        <p style="color: #666; font-size: 12px;">
+          Don't want to receive these emails? <a href="${unsubscribeUrl}" style="color: #f97316;">Unsubscribe</a>
+        </p>
+        <p style="color: #666; font-size: 12px;">
+          &copy; ${new Date().getFullYear()} ${siteInfo.siteName}. All rights reserved.
+        </p>
+      </div>
+    `;
+  }
+
+  return sendEmail({
+    to: email,
+    subject,
+    html,
   });
 }

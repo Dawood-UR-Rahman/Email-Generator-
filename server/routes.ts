@@ -35,12 +35,12 @@ const upload = multer({
     cb(new Error("Only image files are allowed"));
   },
 });
-import { User, Domain, Mailbox, Message, ImapSettings, SmtpSettings, Notification, Log, BlogPost, PageContent, AdSnippet, AppSettings, SiteSettings, ContactSubmission, HomepageContent } from "./models/index";
+import { User, Domain, Mailbox, Message, ImapSettings, SmtpSettings, Notification, Log, BlogPost, PageContent, AdSnippet, AppSettings, SiteSettings, ContactSubmission, HomepageContent, EmailTemplate, NewsletterSubscriber } from "./models/index";
 import { authMiddleware, adminMiddleware, optionalAuthMiddleware, generateToken, AuthRequest } from "./middleware/auth";
-import { sendVerificationEmail, sendPasswordResetEmail, testSmtpConnection, sendTestEmail, sendWelcomeEmail } from "./services/email";
+import { sendVerificationEmail, sendPasswordResetEmail, testSmtpConnection, sendTestEmail, sendWelcomeEmail, sendContactNotification, sendNewsletterConfirmation } from "./services/email";
 import { testImapConnection } from "./services/imap";
 import { startCronJobs } from "./services/cron";
-import { insertUserSchema, loginSchema, insertDomainSchema, imapSettingsSchema, smtpSettingsSchema, insertBlogPostSchema, insertPageContentSchema, insertAdSnippetSchema, appSettingsSchema, siteSettingsSchema, contactSubmissionSchema, homepageContentSchema, resetPasswordSchema } from "@shared/schema";
+import { insertUserSchema, loginSchema, insertDomainSchema, imapSettingsSchema, smtpSettingsSchema, insertBlogPostSchema, insertPageContentSchema, insertAdSnippetSchema, appSettingsSchema, siteSettingsSchema, contactSubmissionSchema, homepageContentSchema, resetPasswordSchema, emailTemplateSchema, newsletterSubscriberSchema } from "@shared/schema";
 
 const DEFAULT_DOMAINS = ["tempmail.io", "quickmail.dev", "disposable.cc"];
 
@@ -941,6 +941,15 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid submission", errors: parsed.error.flatten() });
       }
       const submission = await ContactSubmission.create(parsed.data);
+      
+      // Send notification email to admin (don't block response)
+      sendContactNotification({
+        name: parsed.data.name,
+        email: parsed.data.email,
+        subject: parsed.data.subject,
+        message: parsed.data.message,
+      }).catch(err => console.error("Failed to send contact notification:", err));
+      
       res.status(201).json({ message: "Message sent successfully" });
     } catch (error) {
       console.error("Contact form error:", error);
@@ -1077,6 +1086,169 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Reset password error:", error);
       res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
+  // Email Template Routes
+  app.get("/api/admin/email-templates", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const templates = await EmailTemplate.find().sort({ type: 1 });
+      res.json(templates);
+    } catch (error) {
+      console.error("Get email templates error:", error);
+      res.json([]);
+    }
+  });
+
+  app.get("/api/admin/email-templates/:id", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const template = await EmailTemplate.findById(req.params.id);
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Get email template error:", error);
+      res.status(500).json({ message: "Failed to get template" });
+    }
+  });
+
+  app.post("/api/admin/email-templates", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const parsed = emailTemplateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid template", errors: parsed.error.flatten() });
+      }
+      const template = await EmailTemplate.create(parsed.data);
+      await Log.create({ action: "Email template created", details: parsed.data.name, level: "info" });
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Create email template error:", error);
+      res.status(500).json({ message: "Failed to create template" });
+    }
+  });
+
+  app.put("/api/admin/email-templates/:id", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const parsed = emailTemplateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid template", errors: parsed.error.flatten() });
+      }
+      const template = await EmailTemplate.findByIdAndUpdate(req.params.id, parsed.data, { new: true });
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      await Log.create({ action: "Email template updated", details: template.name, level: "info" });
+      res.json(template);
+    } catch (error) {
+      console.error("Update email template error:", error);
+      res.status(500).json({ message: "Failed to update template" });
+    }
+  });
+
+  app.delete("/api/admin/email-templates/:id", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const template = await EmailTemplate.findByIdAndDelete(req.params.id);
+      if (template) {
+        await Log.create({ action: "Email template deleted", details: template.name, level: "info" });
+      }
+      res.json({ message: "Template deleted" });
+    } catch (error) {
+      console.error("Delete email template error:", error);
+      res.status(500).json({ message: "Failed to delete template" });
+    }
+  });
+
+  // Newsletter Subscription Routes
+  app.post("/api/newsletter/subscribe", async (req, res) => {
+    try {
+      const parsed = newsletterSubscriberSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid email address" });
+      }
+
+      const email = parsed.data.email.toLowerCase();
+      const existingSubscriber = await NewsletterSubscriber.findOne({ email });
+      if (existingSubscriber) {
+        if (existingSubscriber.isActive) {
+          return res.status(400).json({ message: "Email already subscribed" });
+        }
+        await NewsletterSubscriber.findByIdAndUpdate(existingSubscriber._id, { isActive: true });
+        // Send confirmation email (don't block response)
+        sendNewsletterConfirmation(email).catch(err => console.error("Failed to send newsletter confirmation:", err));
+        return res.json({ message: "Subscription reactivated successfully" });
+      }
+
+      await NewsletterSubscriber.create({ email, isActive: true });
+      // Send confirmation email (don't block response)
+      sendNewsletterConfirmation(email).catch(err => console.error("Failed to send newsletter confirmation:", err));
+      res.status(201).json({ message: "Successfully subscribed to newsletter" });
+    } catch (error) {
+      console.error("Newsletter subscribe error:", error);
+      res.status(500).json({ message: "Failed to subscribe" });
+    }
+  });
+
+  app.post("/api/newsletter/unsubscribe", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      await NewsletterSubscriber.findOneAndUpdate(
+        { email: email.toLowerCase() },
+        { isActive: false }
+      );
+      res.json({ message: "Successfully unsubscribed" });
+    } catch (error) {
+      console.error("Newsletter unsubscribe error:", error);
+      res.status(500).json({ message: "Failed to unsubscribe" });
+    }
+  });
+
+  app.get("/api/admin/newsletter-subscribers", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const subscribers = await NewsletterSubscriber.find().sort({ createdAt: -1 });
+      res.json(subscribers);
+    } catch (error) {
+      console.error("Get newsletter subscribers error:", error);
+      res.json([]);
+    }
+  });
+
+  app.delete("/api/admin/newsletter-subscribers/:id", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      await NewsletterSubscriber.findByIdAndDelete(req.params.id);
+      res.json({ message: "Subscriber deleted" });
+    } catch (error) {
+      console.error("Delete newsletter subscriber error:", error);
+      res.status(500).json({ message: "Failed to delete subscriber" });
+    }
+  });
+
+  // Contacts Export Route
+  app.get("/api/admin/contacts/export", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const contacts = await ContactSubmission.find().sort({ createdAt: -1 });
+      
+      const csvHeader = "Name,Email,Subject,Message,Status,Date\n";
+      const csvRows = contacts.map(contact => {
+        const date = new Date(contact.createdAt).toISOString().split('T')[0];
+        const status = contact.isRead ? "Read" : "Unread";
+        const escapedMessage = (contact.message || "").replace(/"/g, '""').replace(/\n/g, ' ');
+        const escapedSubject = (contact.subject || "").replace(/"/g, '""');
+        return `"${contact.name}","${contact.email}","${escapedSubject}","${escapedMessage}","${status}","${date}"`;
+      }).join("\n");
+
+      const csv = csvHeader + csvRows;
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=contacts-export.csv');
+      res.send(csv);
+    } catch (error) {
+      console.error("Export contacts error:", error);
+      res.status(500).json({ message: "Failed to export contacts" });
     }
   });
 
