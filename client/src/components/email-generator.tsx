@@ -217,6 +217,7 @@ export function EmailGenerator() {
                   size="icon"
                   onClick={handleCopy}
                   title={copied ? "Copied!" : "Copy email"}
+                  aria-label={copied ? "Copied!" : "Copy email"}
                   data-testid="button-copy-email"
                 >
                   {copied ? (
@@ -232,6 +233,7 @@ export function EmailGenerator() {
                   onClick={() => refreshInbox()}
                   disabled={isSyncing}
                   title="Refresh inbox"
+                  aria-label="Refresh inbox"
                   data-testid="button-refresh-inbox"
                 >
                   <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
@@ -242,6 +244,7 @@ export function EmailGenerator() {
                   size="icon"
                   onClick={deleteInbox}
                   title="Delete inbox"
+                  aria-label="Delete inbox"
                   data-testid="button-delete-inbox"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -252,6 +255,7 @@ export function EmailGenerator() {
                   size="icon"
                   onClick={handleOpenCustomEmailDialog}
                   title="Custom email"
+                  aria-label="Custom email"
                   data-testid="button-custom-email-inline"
                 >
                   <Edit3 className="h-4 w-4" />
@@ -259,7 +263,7 @@ export function EmailGenerator() {
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon" title="Change domain" data-testid="button-change-domain">
+                    <Button variant="outline" size="icon" title="Change domain" aria-label="Change domain" data-testid="button-change-domain">
                       <ChevronDown className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -300,6 +304,8 @@ export function EmailGenerator() {
                   variant="outline"
                   size="icon"
                   onClick={() => setShowQR(true)}
+                  title="Show QR code"
+                  aria-label="Show QR code"
                   data-testid="button-show-qr"
                 >
                   <QrCode className="h-4 w-4" />

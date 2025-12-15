@@ -2716,6 +2716,7 @@ export default function Admin() {
                                 variant="ghost"
                                 onClick={() => handleMarkContactRead(contact._id)}
                                 title="Mark as read"
+                                aria-label="Mark as read"
                                 data-testid={`button-read-contact-${contact._id}`}
                               >
                                 <CheckCheck className="h-4 w-4" />
