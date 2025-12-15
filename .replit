@@ -42,3 +42,6 @@ waitForPort = 5000
 
 [userenv.shared]
 MONGODB_URI = "mongodb+srv://Dawood:Dawood%401@mavenschatapp.rbbew.mongodb.net/?appName=mavensChatapp"
+
+[agent]
+expertMode = true

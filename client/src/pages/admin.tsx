@@ -5,7 +5,7 @@ import {
   Save, TestTube, Check, X, Send, Trash2, RefreshCw,
   LogOut, AlertCircle, CheckCircle, Eye, EyeOff,
   Plus, Star, Edit, BookOpen, Layout, Megaphone, MessageSquare, Home,
-  Download, MailCheck, Database, Gauge, Info, UserCog
+  Download, MailCheck, Database, Gauge, Info, UserCog, CheckCheck
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,6 +16,20 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+  SidebarHeader,
+  SidebarFooter,
+} from "@/components/ui/sidebar";
 import {
   Form,
   FormControl,
@@ -112,6 +126,24 @@ export default function Admin() {
   const [editingAd, setEditingAd] = useState<AdSnippet | null>(null);
   const [showEmailTemplateDialog, setShowEmailTemplateDialog] = useState(false);
   const [editingEmailTemplate, setEditingEmailTemplate] = useState<EmailTemplate | null>(null);
+  const [activeSection, setActiveSection] = useState("settings");
+
+  const adminMenuItems = [
+    { id: "settings", title: "Settings", icon: Settings },
+    { id: "users", title: "Users", icon: Users },
+    { id: "domains", title: "Domains", icon: Globe },
+    { id: "blog", title: "Blog", icon: BookOpen },
+    { id: "pages", title: "Pages", icon: Layout },
+    { id: "ads", title: "Ads", icon: Megaphone },
+    { id: "site", title: "Site", icon: Globe },
+    { id: "contacts", title: "Contacts", icon: MessageSquare },
+    { id: "homepage", title: "Homepage", icon: Home },
+    { id: "emails", title: "Email Templates", icon: MailCheck },
+    { id: "logs", title: "Logs", icon: FileText },
+    { id: "storage", title: "Storage", icon: Database },
+    { id: "domain-limits", title: "Limits", icon: Gauge },
+    { id: "domain-instructions", title: "Instructions", icon: Info },
+  ];
 
   const imapForm = useForm<InsertImapSettings>({
     resolver: zodResolver(imapSettingsSchema),
@@ -396,6 +428,19 @@ export default function Admin() {
       toast({ title: "Contact submission deleted" });
     } catch {
       toast({ title: "Failed to delete contact", variant: "destructive" });
+    }
+  };
+
+  const handleMarkContactRead = async (contactId: string) => {
+    try {
+      await fetch(`/api/admin/contacts/${contactId}/read`, {
+        method: "PUT",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
+      });
+      setContacts(contacts.map(c => c._id === contactId ? { ...c, isRead: true } : c));
+      toast({ title: "Contact marked as read" });
+    } catch {
+      toast({ title: "Failed to mark as read", variant: "destructive" });
     }
   };
 
@@ -1073,107 +1118,76 @@ export default function Admin() {
     return null;
   }
 
+  const sidebarStyle = {
+    "--sidebar-width": "15rem",
+    "--sidebar-width-icon": "3rem",
+  } as React.CSSProperties;
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-foreground text-background">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between gap-4 h-16">
+    <SidebarProvider style={sidebarStyle}>
+      <div className="flex min-h-screen w-full">
+        <Sidebar>
+          <SidebarHeader className="p-4 border-b border-sidebar-border">
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-                <Mail className="h-5 w-5 text-primary-foreground" />
+              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+                <Mail className="h-4 w-4 text-primary-foreground" />
               </div>
-              <span className="font-bold text-xl">TempMail</span>
-              <Badge variant="secondary" className="ml-2">Admin</Badge>
+              <span className="font-bold">TempMail</span>
             </Link>
-            
-            <div className="flex items-center gap-4">
-              <ThemeToggle />
-              <div className="text-sm text-background/70">
-                {user?.username}
-              </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={handleLogout}
-                className="text-background"
-                data-testid="button-admin-logout"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
+            <Badge variant="secondary" className="mt-2 w-fit">Admin Panel</Badge>
+          </SidebarHeader>
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarGroupLabel>Management</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {adminMenuItems.map((item) => (
+                    <SidebarMenuItem key={item.id}>
+                      <SidebarMenuButton
+                        onClick={() => setActiveSection(item.id)}
+                        isActive={activeSection === item.id}
+                        data-testid={`admin-nav-${item.id}`}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </SidebarContent>
+          <SidebarFooter className="p-4 border-t border-sidebar-border">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              <span>{user?.username}</span>
             </div>
-          </div>
-        </div>
-      </header>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleLogout}
+              className="w-full"
+              data-testid="button-admin-logout"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </SidebarFooter>
+        </Sidebar>
+        
+        <div className="flex-1 flex flex-col min-w-0">
+          <header className="sticky top-0 z-50 h-14 border-b border-border bg-background flex items-center justify-between gap-4 px-4">
+            <div className="flex items-center gap-2">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <h1 className="text-lg font-semibold">
+                {adminMenuItems.find(item => item.id === activeSection)?.title || "Admin"}
+              </h1>
+            </div>
+            <ThemeToggle />
+          </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Admin Panel</h1>
-          <p className="text-muted-foreground">
-            Manage system settings, users, domains, content, and ads
-          </p>
-        </div>
-
-        <Tabs defaultValue="settings" className="space-y-6">
-          <TabsList className="flex flex-wrap gap-1">
-            <TabsTrigger value="settings" data-testid="admin-tab-settings">
-              <Settings className="h-4 w-4 mr-2 hidden sm:inline" />
-              Settings
-            </TabsTrigger>
-            <TabsTrigger value="users" data-testid="admin-tab-users">
-              <Users className="h-4 w-4 mr-2 hidden sm:inline" />
-              Users
-            </TabsTrigger>
-            <TabsTrigger value="domains" data-testid="admin-tab-domains">
-              <Globe className="h-4 w-4 mr-2 hidden sm:inline" />
-              Domains
-            </TabsTrigger>
-            <TabsTrigger value="blog" data-testid="admin-tab-blog">
-              <BookOpen className="h-4 w-4 mr-2 hidden sm:inline" />
-              Blog
-            </TabsTrigger>
-            <TabsTrigger value="pages" data-testid="admin-tab-pages">
-              <Layout className="h-4 w-4 mr-2 hidden sm:inline" />
-              Pages
-            </TabsTrigger>
-            <TabsTrigger value="ads" data-testid="admin-tab-ads">
-              <Megaphone className="h-4 w-4 mr-2 hidden sm:inline" />
-              Ads
-            </TabsTrigger>
-            <TabsTrigger value="site" data-testid="admin-tab-site">
-              <Globe className="h-4 w-4 mr-2 hidden sm:inline" />
-              Site
-            </TabsTrigger>
-            <TabsTrigger value="contacts" data-testid="admin-tab-contacts">
-              <MessageSquare className="h-4 w-4 mr-2 hidden sm:inline" />
-              Contacts
-            </TabsTrigger>
-            <TabsTrigger value="homepage" data-testid="admin-tab-homepage">
-              <Home className="h-4 w-4 mr-2 hidden sm:inline" />
-              Homepage
-            </TabsTrigger>
-            <TabsTrigger value="emails" data-testid="admin-tab-emails">
-              <MailCheck className="h-4 w-4 mr-2 hidden sm:inline" />
-              Email Templates
-            </TabsTrigger>
-            <TabsTrigger value="logs" data-testid="admin-tab-logs">
-              <FileText className="h-4 w-4 mr-2 hidden sm:inline" />
-              Logs
-            </TabsTrigger>
-            <TabsTrigger value="storage" data-testid="admin-tab-storage">
-              <Database className="h-4 w-4 mr-2 hidden sm:inline" />
-              Storage
-            </TabsTrigger>
-            <TabsTrigger value="domain-limits" data-testid="admin-tab-domain-limits">
-              <Gauge className="h-4 w-4 mr-2 hidden sm:inline" />
-              Limits
-            </TabsTrigger>
-            <TabsTrigger value="domain-instructions" data-testid="admin-tab-domain-instructions">
-              <Info className="h-4 w-4 mr-2 hidden sm:inline" />
-              Instructions
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="settings" className="space-y-6">
+          <main className="flex-1 overflow-auto p-4 md:p-6">
+            <Tabs value={activeSection} onValueChange={setActiveSection} className="space-y-6">
+              <TabsContent value="settings" className="space-y-6 mt-0">
             <div className="grid gap-6 lg:grid-cols-2">
               <Card className="p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -2635,6 +2649,7 @@ export default function Admin() {
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Subject</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -2642,16 +2657,21 @@ export default function Admin() {
                 <TableBody>
                   {contacts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                         No contact submissions yet
                       </TableCell>
                     </TableRow>
                   ) : (
                     contacts.map((contact) => (
-                      <TableRow key={contact._id} data-testid={`row-contact-${contact._id}`}>
+                      <TableRow key={contact._id} data-testid={`row-contact-${contact._id}`} className={!contact.isRead ? "bg-primary/5" : ""}>
                         <TableCell className="font-medium">{contact.name}</TableCell>
                         <TableCell>{contact.email}</TableCell>
                         <TableCell>{contact.subject}</TableCell>
+                        <TableCell>
+                          <Badge variant={contact.isRead ? "secondary" : "default"}>
+                            {contact.isRead ? "Read" : "Unread"}
+                          </Badge>
+                        </TableCell>
                         <TableCell>{new Date(contact.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
@@ -2660,6 +2680,7 @@ export default function Admin() {
                                 <Button 
                                   size="icon" 
                                   variant="ghost"
+                                  onClick={() => !contact.isRead && handleMarkContactRead(contact._id)}
                                   data-testid={`button-view-contact-${contact._id}`}
                                 >
                                   <Eye className="h-4 w-4" />
@@ -2689,6 +2710,17 @@ export default function Admin() {
                                 </div>
                               </DialogContent>
                             </Dialog>
+                            {!contact.isRead && (
+                              <Button 
+                                size="icon" 
+                                variant="ghost"
+                                onClick={() => handleMarkContactRead(contact._id)}
+                                title="Mark as read"
+                                data-testid={`button-read-contact-${contact._id}`}
+                              >
+                                <CheckCheck className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button 
                               size="icon" 
                               variant="ghost"
@@ -3339,8 +3371,10 @@ export default function Admin() {
               </Form>
             </Card>
           </TabsContent>
-        </Tabs>
-      </main>
-    </div>
+            </Tabs>
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
   );
 }

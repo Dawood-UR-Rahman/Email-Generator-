@@ -211,58 +211,56 @@ export function EmailGenerator() {
             </div>
 
             {currentEmail && (
-              <div className="flex flex-wrap items-center justify-center gap-2">
+              <div className="flex items-center justify-center gap-1 flex-nowrap overflow-x-auto">
                 <Button
                   variant={copied ? "default" : "outline"}
+                  size="icon"
                   onClick={handleCopy}
+                  title={copied ? "Copied!" : "Copy email"}
                   data-testid="button-copy-email"
                 >
                   {copied ? (
-                    <>
-                      <Check className="h-4 w-4 mr-2" />
-                      Copied!
-                    </>
+                    <Check className="h-4 w-4" />
                   ) : (
-                    <>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copy
-                    </>
+                    <Copy className="h-4 w-4" />
                   )}
                 </Button>
 
                 <Button
                   variant="outline"
+                  size="icon"
                   onClick={() => refreshInbox()}
                   disabled={isSyncing}
+                  title="Refresh inbox"
                   data-testid="button-refresh-inbox"
                 >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? "animate-spin" : ""}`} />
-                  Refresh
+                  <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
                 </Button>
 
                 <Button
                   variant="outline"
+                  size="icon"
                   onClick={deleteInbox}
+                  title="Delete inbox"
                   data-testid="button-delete-inbox"
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
+                  <Trash2 className="h-4 w-4" />
                 </Button>
 
                 <Button
                   variant="outline"
+                  size="icon"
                   onClick={handleOpenCustomEmailDialog}
+                  title="Custom email"
                   data-testid="button-custom-email-inline"
                 >
-                  <Edit3 className="h-4 w-4 mr-2" />
-                  Custom Email
+                  <Edit3 className="h-4 w-4" />
                 </Button>
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" data-testid="button-change-domain">
-                      <ChevronDown className="h-4 w-4 mr-2" />
-                      Change
+                    <Button variant="outline" size="icon" title="Change domain" data-testid="button-change-domain">
+                      <ChevronDown className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="center" className="w-56">

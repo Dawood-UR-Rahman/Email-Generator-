@@ -27,31 +27,31 @@ function MessageRow({ message, onClick }: { message: Message; onClick: () => voi
   
   return (
     <div
-      className={`flex items-center gap-4 p-4 border-b border-border cursor-pointer transition-colors hover:bg-primary/5 ${
+      className={`flex items-center gap-2 sm:gap-4 p-3 sm:p-4 border-b border-border cursor-pointer transition-colors hover:bg-primary/5 ${
         !message.isRead ? "bg-primary/5" : ""
       }`}
       onClick={onClick}
       data-testid={`message-row-${message._id}`}
     >
-      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-        <span className="text-sm font-semibold text-primary">
+      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+        <span className="text-xs sm:text-sm font-semibold text-primary">
           {(message.fromName || message.from).charAt(0).toUpperCase()}
         </span>
       </div>
       
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className={`font-medium truncate ${!message.isRead ? "text-foreground" : "text-muted-foreground"}`}>
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <span className={`font-medium truncate text-sm sm:text-base ${!message.isRead ? "text-foreground" : "text-muted-foreground"}`}>
             {message.fromName || message.from.split("@")[0]}
           </span>
           {!message.isRead && (
             <Badge variant="default" className="text-xs">New</Badge>
           )}
         </div>
-        <p className="text-sm text-muted-foreground truncate">{message.subject}</p>
+        <p className="text-xs sm:text-sm text-muted-foreground truncate">{message.subject}</p>
       </div>
       
-      <div className="text-xs text-muted-foreground whitespace-nowrap">
+      <div className="text-xs text-muted-foreground whitespace-nowrap hidden sm:block">
         {timeAgo}
       </div>
     </div>
@@ -82,32 +82,32 @@ function MessageView({ message, onBack }: { message: Message; onBack: () => void
         </Button>
       </div>
       
-      <div className="p-6 border-b border-border">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <span className="text-lg font-semibold text-primary">
+      <div className="p-4 md:p-6 border-b border-border">
+        <div className="flex items-start gap-3 md:gap-4">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <span className="text-base md:text-lg font-semibold text-primary">
               {(message.fromName || message.from).charAt(0).toUpperCase()}
             </span>
           </div>
           
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-4 mb-1">
-              <span className="font-semibold">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4 mb-1">
+              <span className="font-semibold truncate">
                 {message.fromName || message.from.split("@")[0]}
               </span>
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="text-xs w-fit">
                 {timeAgo}
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground">{message.from}</p>
+            <p className="text-sm text-muted-foreground break-all">{message.from}</p>
           </div>
         </div>
         
-        <h2 className="text-xl font-semibold mt-4">{message.subject}</h2>
+        <h2 className="text-lg md:text-xl font-semibold mt-3 md:mt-4 break-words">{message.subject}</h2>
       </div>
       
       <ScrollArea className="flex-1">
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           {message.htmlBody ? (
             <div 
               className="prose prose-sm dark:prose-invert max-w-none"
@@ -132,9 +132,9 @@ export function Inbox() {
   }
 
   return (
-    <section className="py-8 md:py-12">
+    <section className="py-4 md:py-8 lg:py-12 px-2 sm:px-0">
       <div className="w-full">
-        <Card className="overflow-hidden min-h-[400px]">
+        <Card className="overflow-hidden min-h-[350px] md:min-h-[400px]">
           {selectedMessage ? (
             <MessageView 
               message={selectedMessage} 
