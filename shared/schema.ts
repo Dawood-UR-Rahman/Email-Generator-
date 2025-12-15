@@ -277,16 +277,40 @@ export interface SiteSettings {
   _id: string;
   siteName: string;
   siteLogo: string;
+  headerLogo: string;
+  footerLogo: string;
   defaultMetaTitle: string;
   defaultMetaDescription: string;
+  footerText: string;
+  copyrightText: string;
+  socialLinks: SocialLinks;
+  contactEmail: string;
   updatedAt: Date;
+}
+
+export interface SocialLinks {
+  twitter: string;
+  github: string;
+  linkedin: string;
+  facebook: string;
 }
 
 export const siteSettingsSchema = z.object({
   siteName: z.string().min(1, "Site name is required").default("TempMail"),
   siteLogo: z.string().optional().default(""),
+  headerLogo: z.string().optional().default(""),
+  footerLogo: z.string().optional().default(""),
   defaultMetaTitle: z.string().optional().default("TempMail - Free Temporary Email Service"),
   defaultMetaDescription: z.string().optional().default("Create disposable email addresses instantly. Protect your privacy with our free temporary email service."),
+  footerText: z.string().optional().default("Free temporary email addresses for protecting your privacy online. No registration required."),
+  copyrightText: z.string().optional().default("All rights reserved."),
+  socialLinks: z.object({
+    twitter: z.string().optional().default(""),
+    github: z.string().optional().default(""),
+    linkedin: z.string().optional().default(""),
+    facebook: z.string().optional().default(""),
+  }).optional().default({}),
+  contactEmail: z.string().email().optional().or(z.literal("")).default(""),
 });
 
 export type InsertSiteSettings = z.infer<typeof siteSettingsSchema>;
@@ -357,6 +381,42 @@ export const homepageContentSchema = z.object({
 });
 
 export type InsertHomepageContent = z.infer<typeof homepageContentSchema>;
+
+// Email Template Schema
+export interface EmailTemplate {
+  _id: string;
+  type: "welcome" | "forgot_password" | "contact_notification" | "newsletter_confirmation";
+  name: string;
+  subject: string;
+  htmlContent: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const emailTemplateSchema = z.object({
+  type: z.enum(["welcome", "forgot_password", "contact_notification", "newsletter_confirmation"]),
+  name: z.string().min(1, "Template name is required"),
+  subject: z.string().min(1, "Subject is required"),
+  htmlContent: z.string().min(1, "HTML content is required"),
+  isActive: z.boolean().default(true),
+});
+
+export type InsertEmailTemplate = z.infer<typeof emailTemplateSchema>;
+
+// Newsletter Subscriber Schema
+export interface NewsletterSubscriber {
+  _id: string;
+  email: string;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export const newsletterSubscriberSchema = z.object({
+  email: z.string().email("Invalid email address"),
+});
+
+export type InsertNewsletterSubscriber = z.infer<typeof newsletterSubscriberSchema>;
 
 // API Response types
 export interface AuthResponse {

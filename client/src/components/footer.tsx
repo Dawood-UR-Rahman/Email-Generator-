@@ -14,7 +14,6 @@ const resourceLinks = [
   { label: "Privacy Policy", href: "/privacy" },
   { label: "Terms of Service", href: "/terms" },
   { label: "FAQ", href: "/#faq" },
-  { label: "API Documentation", href: "/api-docs" },
 ];
 
 export function Footer() {

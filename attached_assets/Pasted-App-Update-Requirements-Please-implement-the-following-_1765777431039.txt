@@ -1,0 +1,87 @@
+App Update Requirements
+
+Please implement the following updates and enhancements in the application:
+
+1. UI & Theme
+
+In mobile view, display icons only on buttons so that all buttons appear in a single row without breaking the layout.
+
+Set Light Mode as the default theme instead of Dark Mode.
+
+2. Admin Content Management
+
+Provide admin access to manage and update the following content from the admin panel:
+
+Terms & Conditions
+
+Privacy Policy
+
+Footer content, including:
+
+“All Rights Reserved” text
+
+Social media icon links
+
+Remove the API Documentation link from the footer.
+
+3. Logo Management
+
+Allow the admin to upload custom logos for both the header and footer via the admin panel.
+
+Hide the default Temp Mail logo, icon, and text.
+
+Display the admin-uploaded logo in both the header and footer instead of the default branding.
+
+4. Contact Form (Important)
+
+When a user submits the contact form:
+
+Save all submission data to the database.
+
+Allow the admin to view, manage, and export submissions from the admin panel.
+
+Display submissions in a clean, organized, and user-friendly format.
+
+Additionally:
+
+Send the contact form submission details to the admin email in a well-designed, formatted email.
+
+Add a Contact Settings section in the admin panel where the admin can define the email address for receiving contact form notifications.
+
+5. Email Templates (Most Important)
+
+Add a dedicated Email Templates tab in the admin panel.
+
+Allow the admin to create and manage custom email templates for:
+
+Welcome Email
+
+Forgot Password Email
+
+Contact Form Submission Notification
+
+Newsletter Subscription Confirmation
+
+Email Editor Requirements
+
+Include a Notes / Help section in each email editor explaining available variables/placeholders (e.g., {{username}}, {{email}}, {{message}}) and how to use them.
+
+If the admin does not create a custom email template:
+
+Automatically use a default system email template that includes:
+
+Site logo
+
+Clean and professional layout
+
+Properly formatted email content
+
+Replace plain text links in emails with styled buttons for improved user experience.
+
+6. Newsletter Subscription
+
+When a user enters their email in the footer newsletter section and clicks Subscribe:
+
+Send a thank-you confirmation email to the user.
+
+The email should be in a beautiful, professional format and include the site logo.
