@@ -515,6 +515,55 @@ export async function registerRoutes(
     }
   });
 
+  app.put("/api/admin/users/:id", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { username, email, role } = req.body;
+
+      await User.findByIdAndUpdate(id, { username, email, role });
+      res.json({ message: "User updated" });
+    } catch (error) {
+      console.error("Update user error:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/admin/users/:id", authMiddleware as any, adminMiddleware as any, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await User.findByIdAndDelete(id);
+      res.json({ message: "User deleted" });
+    } catch (error) {
+      console.error("Delete user error:", error);
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  app.post("/api/admin/users/:id/login-as", authMiddleware as any, adminMiddleware as any, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const user = await User.findById(id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const token = generateToken(user._id.toString());
+      res.json({ 
+        token,
+        user: {
+          _id: user._id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          isVerified: user.isVerified,
+        }
+      });
+    } catch (error) {
+      console.error("Login as user error:", error);
+      res.status(500).json({ message: "Failed to login as user" });
+    }
+  });
+
   app.get("/api/admin/domains", authMiddleware as any, adminMiddleware as any, async (req, res) => {
     try {
       const domains = await Domain.find().sort({ createdAt: -1 });
