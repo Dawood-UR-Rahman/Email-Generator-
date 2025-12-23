@@ -316,6 +316,8 @@ export default function Admin() {
         fetch("/api/domain-instructions", { headers }),
       ]);
       
+      const userData = await usersRes.json();
+      console.log("userData:", userData);
       if (domainsRes.ok) {
         const data = await domainsRes.json();
         setDomains(data);
@@ -332,15 +334,15 @@ export default function Admin() {
         const data = await adsRes.json();
         setAds(data);
       }
-      if (settingsRes.ok) {
-        const data = await settingsRes.json();
-        setAppSettings(data);
-        settingsForm.reset({
-          defaultRetentionDays: data.defaultRetentionDays || 5,
-          emailSyncIntervalSeconds: data.emailSyncIntervalSeconds || 10,
-          soundNotificationsEnabled: data.soundNotificationsEnabled ?? true,
-        });
-      }
+      // if (settingsRes.ok) {
+      //   const data = await settingsRes.json();
+      //   setAppSettings(data);
+      //   settingsForm.reset({
+      //     defaultRetentionDays: data.defaultRetentionDays || 5,
+      //     emailSyncIntervalSeconds: data.emailSyncIntervalSeconds || 10,
+      //     soundNotificationsEnabled: data.soundNotificationsEnabled ?? true,
+      //   });
+      // }
       if (siteSettingsRes.ok) {
         const data = await siteSettingsRes.json();
         setSiteSettings(data);
@@ -385,8 +387,9 @@ export default function Admin() {
         setEmailTemplates(data);
       }
       if (usersRes.ok) {
-        const data = await usersRes.json();
-        setUsers(data);
+        // const data = await usersRes.json();
+        setUsers(userData);
+        console.log(users);
       }
       if (storageRes.ok) {
         const data = await storageRes.json();
