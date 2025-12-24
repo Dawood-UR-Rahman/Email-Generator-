@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { ThemeToggle } from "@/components/theme-toggle";
 
+
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
@@ -35,6 +36,7 @@ export default function Login() {
 
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
+    mode: "onChange",
     defaultValues: {
       email: "",
       password: "",
@@ -44,12 +46,11 @@ export default function Login() {
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
     try {
-      await login(data.email, data.password);
+     await login(data.email, data.password);
       toast({
         title: "Welcome back!",
         description: "You have successfully logged in.",
-      });
-      setLocation("/dashboard");
+      }); // 1 second delay
     } catch (error) {
       toast({
         title: "Login failed",

@@ -389,7 +389,6 @@ export default function Admin() {
       if (usersRes.ok) {
         // const data = await usersRes.json();
         setUsers(userData);
-        console.log(users);
       }
       if (storageRes.ok) {
         const data = await storageRes.json();

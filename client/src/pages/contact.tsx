@@ -34,6 +34,7 @@ export default function Contact() {
 
   const form = useForm<ContactForm>({
     resolver: zodResolver(contactSchema),
+    mode: "onChange",
     defaultValues: {
       name: "",
       email: "",
@@ -167,7 +168,7 @@ export default function Contact() {
                     <Button 
                       type="submit" 
                       size="lg"
-                      disabled={isLoading}
+                      disabled={!form.formState.isValid || isLoading}
                       data-testid="button-contact-submit"
                     >
                       {isLoading ? (

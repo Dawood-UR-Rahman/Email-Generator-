@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { User } from "../models/index";
 
-const JWT_SECRET = process.env.SESSION_SECRET || "your-secret-key";
+const JWT_SECRET = process.env.SESSION_SECRET || "ef7747c0a8806ff5afe83ebd7bbcdd39";
 
 export interface AuthRequest extends Request {
   user?: {

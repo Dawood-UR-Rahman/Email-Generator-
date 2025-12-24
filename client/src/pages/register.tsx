@@ -18,17 +18,24 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PasswordRequirements } from "@/components/ui/password-requirements";
 
-const registerSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+ const registerSchema = z.object({
+  username: z.string()
+    .min(3, "Username must be at least 3 characters"),
+  email: z.string()
+    .email("Invalid email address"),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(
+      /(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).*/,
+      "Password must contain at least one number and one special character"
+    ),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
 });
-
 type RegisterForm = z.infer<typeof registerSchema>;
 
 export default function Register() {
@@ -40,6 +47,7 @@ export default function Register() {
 
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
+    mode: "onChange",
     defaultValues: {
       username: "",
       email: "",
@@ -47,6 +55,8 @@ export default function Register() {
       confirmPassword: "",
     },
   });
+
+  const passwordValue = form.watch("password");
 
   const onSubmit = async (data: RegisterForm) => {
     setIsLoading(true);
@@ -156,6 +166,7 @@ export default function Register() {
                       </div>
                     </FormControl>
                     <FormMessage />
+                    <PasswordRequirements password={passwordValue} />
                   </FormItem>
                 )}
               />
@@ -182,7 +193,7 @@ export default function Register() {
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={isLoading}
+                disabled={!form.formState.isValid || isLoading}
                 data-testid="button-register-submit"
               >
                 {isLoading ? (

@@ -17,14 +17,21 @@ import {
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PasswordRequirements } from "@/components/ui/password-requirements";
 
 const resetPasswordFormSchema = z.object({
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(
+      /(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).*/,
+      "Password must contain at least one number and one special character"
+    ),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
 });
+
 
 type ResetPasswordFormData = z.infer<typeof resetPasswordFormSchema>;
 
@@ -48,11 +55,14 @@ export default function ResetPassword() {
 
   const form = useForm<ResetPasswordFormData>({
     resolver: zodResolver(resetPasswordFormSchema),
+    mode: "onChange",
     defaultValues: {
       password: "",
       confirmPassword: "",
     },
   });
+
+  const passwordValue = form.watch("password");
 
   const onSubmit = async (data: ResetPasswordFormData) => {
     if (!token) return;
@@ -156,6 +166,7 @@ export default function ResetPassword() {
                           />
                         </FormControl>
                         <FormMessage />
+                        <PasswordRequirements password={passwordValue} />
                       </FormItem>
                     )}
                   />
@@ -182,7 +193,7 @@ export default function ResetPassword() {
                   <Button 
                     type="submit" 
                     className="w-full" 
-                    disabled={isLoading}
+                    disabled={!form.formState.isValid || isLoading}
                     data-testid="button-reset-submit"
                   >
                     {isLoading ? (

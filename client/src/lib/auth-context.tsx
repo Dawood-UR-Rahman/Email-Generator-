@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { User } from "@shared/schema";
-
+import { Link, useLocation } from "wouter";
 interface AuthContextType {
   user: Omit<User, "password"> | null;
   token: string | null;
@@ -18,7 +18,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Omit<User, "password"> | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
+ const [, setLocation] = useLocation();
   useEffect(() => {
     const storedToken = localStorage.getItem("authToken");
     const storedUser = localStorage.getItem("authUser");
@@ -52,6 +52,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(data.token);
     localStorage.setItem("authToken", data.token);
     localStorage.setItem("authUser", JSON.stringify(data.user));
+    setTimeout(() => {
+     if(data.user.role === "admin") {
+      setLocation("/admin");
+    } else {
+      setLocation("/dashboard");
+    }
+}, 1000);
   };
 
   const register = async (username: string, email: string, password: string) => {

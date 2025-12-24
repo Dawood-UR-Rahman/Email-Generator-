@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { SiteSettings, SocialLinks } from "@shared/schema";
+import { isValidEmail } from "@/lib/validation";
 
 const quickLinks = [
   { label: "Home", href: "/" },
@@ -54,11 +55,21 @@ export function Footer() {
     },
   });
 
+  const [emailError, setEmailError] = useState<string | null>(null);
+
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
-    if (email.trim()) {
-      subscribeMutation.mutate(email.trim());
+    const val = email.trim();
+    if (!val) {
+      setEmailError("Email is required");
+      return;
     }
+    if (!isValidEmail(val)) {
+      setEmailError("Invalid email address");
+      return;
+    }
+    setEmailError(null);
+    subscribeMutation.mutate(val);
   };
 
   const siteName = siteSettings?.siteName || "TempMail";
@@ -167,19 +178,33 @@ export function Footer() {
             <p className="text-sm text-background/70 mb-4">
               Subscribe to get updates on privacy tips and new features.
             </p>
-            <form onSubmit={handleSubscribe} className="flex gap-2">
-              <Input 
-                type="email"
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="bg-background/10 border-background/20 text-background placeholder:text-background/50"
-                data-testid="input-newsletter-email"
-                required
-              />
+            <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-2">
+              <div className="flex-1">
+                <Input 
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (e.target.value && !isValidEmail(e.target.value)) {
+                      setEmailError("Invalid email address");
+                    } else {
+                      setEmailError(null);
+                    }
+                  }}
+                  className="bg-background/10 border-background/20 text-background placeholder:text-background/50"
+                  data-testid="input-newsletter-email"
+                  aria-invalid={!!emailError}
+                  aria-describedby="newsletter-email-error"
+                  required
+                />
+                {emailError && (
+                  <p id="newsletter-email-error" className="text-sm text-destructive mt-1">{emailError}</p>
+                )}
+              </div>
               <Button 
                 type="submit" 
-                disabled={subscribeMutation.isPending}
+                disabled={subscribeMutation.isPending || !!emailError}
                 data-testid="button-subscribe"
               >
                 {subscribeMutation.isPending ? "..." : "Subscribe"}
